@@ -1,45 +1,57 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI Accuracy | Admin</title>
-    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <th:block th:replace="~{fragments/admin :: adminHead('AI Accuracy')}"></th:block>
 </head>
-<body class="admin">
-<div class="admin-header">
-    <h1>⚡ AI ACCURACY</h1>
-    <nav class="admin-nav">
-        <a href="/admin">Dashboard</a>
-        <a href="/admin/users">Users</a>
-        <a href="/admin/invites">Invites</a>
-        <a href="/admin/meal-plans">Meal Plans</a>
-        <a href="/admin/ai-accuracy" class="active">AI Accuracy</a>
-    </nav>
-</div>
-<div class="admin-container">
-    <div class="stats-grid">
-        <div class="stat-card"><div class="stat-label">Overall Accuracy</div><div class="stat-value" th:text="${overallAccuracy} + '%'">0%</div></div>
-        <div class="stat-card"><div class="stat-label">Failure Rate</div><div class="stat-value" th:text="${failureRate} + '%'">0%</div></div>
-        <div class="stat-card"><div class="stat-label">Inaccurate Plans</div><div class="stat-value" th:text="${inaccuratePlanCount}">0</div></div>
+<body class="neon">
+<th:block th:replace="~{fragments/admin :: navbar('accuracy')}"></th:block>
+
+<div class="container py-4">
+    <h2 class="section-title mb-4">AI accuracy</h2>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-4">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Average accuracy</div>
+                <div class="stat-value" th:text="${overallAccuracy} + '%'">0%</div>
+                <div class="stat-sub">plan macros vs targets</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Failure rate</div>
+                <div class="stat-value" th:text="${failureRate} + '%'">0%</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-md-4">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Below 90%</div>
+                <div class="stat-value" th:text="${inaccuratePlanCount}">0</div>
+            </div></div>
+        </div>
     </div>
-    <div class="admin-table-container">
-        <h2 style="margin-top:0">Plans Below 90%</h2>
-        <table class="admin-table" th:if="${!#lists.isEmpty(inaccuratePlans)}">
-            <thead><tr><th>ID</th><th>User</th><th>Created</th><th>Accuracy</th><th>Actions</th></tr></thead>
-            <tbody>
-            <tr th:each="plan : ${inaccuratePlans}">
-                <td th:text="${plan.id}">1</td>
-                <td th:text="${plan.user.email}">email</td>
-                <td th:text="${plan.createdAt}">date</td>
-                <td th:text="${plan.accuracyScore} + '%'">0%</td>
-                <td><a th:href="@{/admin/meal-plans/{id}(id=${plan.id})}" class="btn-admin">View</a></td>
-            </tr>
-            </tbody>
-        </table>
-        <div th:if="${#lists.isEmpty(inaccuratePlans)}" style="opacity:.6">No inaccurate plans.</div>
+
+    <div class="card neon">
+        <div class="card-body">
+            <h5 class="mb-3">Plans below 90% accuracy</h5>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(inaccuratePlans)}">
+                <table class="table table-dark table-hover">
+                    <thead><tr><th>Client</th><th>Created</th><th>Accuracy</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="plan : ${inaccuratePlans}" th:attr="data-href=@{/admin/meal-plans/{id}(id=${plan.id})}">
+                        <td th:text="${plan.user.email}">email</td>
+                        <td th:text="${plan.createdAt != null ? #temporals.format(plan.createdAt, 'MMM d, yyyy') : ''}">date</td>
+                        <td><span class="badge bg-danger" th:text="${plan.accuracyScore} + '%'">0%</span></td>
+                        <td class="text-end"><a th:href="@{/admin/meal-plans/{id}(id=${plan.id})}" class="btn btn-sm btn-outline-neon">View</a></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div th:if="${#lists.isEmpty(inaccuratePlans)}" class="empty-state">No plans below 90%. Plans get scored once the food engine update lands.</div>
+        </div>
     </div>
 </div>
+
+<th:block th:replace="~{fragments/admin :: scripts}"></th:block>
 </body>
 </html>
-
