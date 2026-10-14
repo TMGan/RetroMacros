@@ -110,6 +110,15 @@ public class MealPlanService {
         }
     }
 
+    public boolean isMockMode() {
+        return mockMode;
+    }
+
+    /** Built-in offline plan. Never calls the paid API, whatever ai.mock is set to. */
+    public MealPlan generateSampleMealPlan(UserProfile profile, MacroTargets targets) {
+        return generateMockMealPlan(profile, targets);
+    }
+
     public GroceryList generateGroceryList(MealPlan plan) {
         Map<String, Map<String, Map<String, Double>>> agg = new LinkedHashMap<>();
         // category -> item -> unit -> totalQuantity

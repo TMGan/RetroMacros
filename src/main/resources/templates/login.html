@@ -78,6 +78,10 @@
                         </div>
                     </div>
 
+                    <div th:if="${param.error}" class="alert alert-danger" role="alert">
+                        Sign-in didn't go through. Retro Macros is invite-only, so check that you used the Google account your coach invited.
+                    </div>
+
                     <a href="/oauth2/authorization/google" class="btn btn-neon btn-lg">
                         <i class="bi bi-google me-2"></i> Sign in with Google
                     </a>

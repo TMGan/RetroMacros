@@ -38,6 +38,11 @@ services:
       - key: APP_URL
         sync: false
 
+      # Comma-separated Google emails that can always sign in and are admins.
+      # Required: prod is invite-only, so without this nobody can get in.
+      - key: ADMIN_EMAILS
+        sync: false
+
       - key: GOOGLE_CLIENT_ID
         sync: false
       - key: GOOGLE_CLIENT_SECRET

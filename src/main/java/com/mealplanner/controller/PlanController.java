@@ -24,7 +24,10 @@ public class PlanController {
     private final UserRepository userRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public PlanController(SavedMealPlanRepository savedMealPlanRepository, UserRepository userRepository) {
+    private final com.mealplanner.service.CurrentUserService currentUserService;
+
+    public PlanController(SavedMealPlanRepository savedMealPlanRepository, UserRepository userRepository, com.mealplanner.service.CurrentUserService currentUserService) {
+        this.currentUserService = currentUserService;
         this.savedMealPlanRepository = savedMealPlanRepository;
         this.userRepository = userRepository;
     }
@@ -32,11 +35,10 @@ public class PlanController {
     @GetMapping("/plan/{id}")
     public String viewPlan(@PathVariable Long id,
                            @AuthenticationPrincipal OAuth2User principal,
+                           jakarta.servlet.http.HttpSession session,
                            Model model) {
         if (principal == null) return "redirect:/login";
-        String email = principal.getAttribute("email");
-        User user = userRepository.findByEmail(email).orElse(null);
-        if (user == null) return "redirect:/login";
+        User user = currentUserService.requireForView(principal, session);
 
         Optional<SavedMealPlan> opt = savedMealPlanRepository.findById(id);
         if (opt.isEmpty()) return "redirect:/dashboard";

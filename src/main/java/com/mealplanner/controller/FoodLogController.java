@@ -3,15 +3,23 @@ package com.mealplanner.controller;
 import com.mealplanner.model.FoodLog;
 import com.mealplanner.model.User;
 import com.mealplanner.repository.UserRepository;
+import com.mealplanner.service.AiQuotaService;
+import com.mealplanner.service.CurrentUserService;
 import com.mealplanner.service.FoodLogService;
+import jakarta.servlet.http.HttpSession;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -20,12 +28,22 @@ import java.util.Map;
 @RequestMapping("/food-log")
 public class FoodLogController {
 
+    private static final int MAX_DESCRIPTION_LENGTH = 500;
+    private static final int MAX_MEAL_NAME_LENGTH = 100;
+
     private final FoodLogService foodLogService;
     private final UserRepository userRepository;
+    private final CurrentUserService currentUserService;
+    private final AiQuotaService aiQuotaService;
 
-    public FoodLogController(FoodLogService foodLogService, UserRepository userRepository) {
+    public FoodLogController(FoodLogService foodLogService,
+                             UserRepository userRepository,
+                             CurrentUserService currentUserService,
+                             AiQuotaService aiQuotaService) {
         this.foodLogService = foodLogService;
         this.userRepository = userRepository;
+        this.currentUserService = currentUserService;
+        this.aiQuotaService = aiQuotaService;
     }
 
     @PostMapping("/add")
@@ -38,23 +56,13 @@ public class FoodLogController {
                              @RequestParam int fat,
                              @RequestParam(required = false, name = "timezone") String timezone,
                              RedirectAttributes redirectAttributes) {
-        User user = resolveUser(principal);
-        FoodLog foodLog = new FoodLog();
-        foodLog.setUser(user);
-        foodLog.setMealName(mealName);
-        foodLog.setFoodDescription(foodDescription);
-        foodLog.setCalories(calories);
-        foodLog.setProtein(protein);
-        foodLog.setCarbs(carbs);
-        foodLog.setFat(fat);
-        foodLog.setFromMealPlan(false);
-        try {
-            java.time.ZoneId zone = (timezone != null && !timezone.isBlank()) ? java.time.ZoneId.of(timezone) : java.time.ZoneId.systemDefault();
-            foodLog.setLogDate(java.time.LocalDate.now(zone));
-            foodLog.setTimeLogged(java.time.LocalDateTime.now(zone));
-        } catch (Exception ignore) {}
-        foodLogService.addFoodLog(foodLog);
-        redirectAttributes.addFlashAttribute("success", "Food logged successfully!");
+        User user = currentUserService.require(principal);
+        String error = saveLog(user, mealName, foodDescription, calories, protein, carbs, fat, timezone, false);
+        if (error != null) {
+            redirectAttributes.addFlashAttribute("error", error);
+        } else {
+            redirectAttributes.addFlashAttribute("success", "Food logged successfully!");
+        }
         return "redirect:/dashboard";
     }
 
@@ -68,28 +76,68 @@ public class FoodLogController {
                                        @RequestParam int fat,
                                        @RequestParam(required = false, name = "timezone") String timezone,
                                        RedirectAttributes redirectAttributes) {
-        User user = resolveUser(principal);
+        User user = currentUserService.require(principal);
+        String error = saveLog(user, mealName, foodDescription, calories, protein, carbs, fat, timezone, true);
+        if (error != null) {
+            redirectAttributes.addFlashAttribute("error", error);
+        } else {
+            redirectAttributes.addFlashAttribute("success", "Meal logged successfully!");
+        }
+        return "redirect:/dashboard";
+    }
+
+    /** Validates and stores one entry. Returns an error message, or null on success. */
+    private String saveLog(User user, String mealName, String foodDescription,
+                           int calories, int protein, int carbs, int fat,
+                           String timezone, boolean fromMealPlan) {
+        String description = foodDescription == null ? "" : foodDescription.trim();
+        String meal = mealName == null ? "" : mealName.trim();
+        if (description.isEmpty() || description.length() > MAX_DESCRIPTION_LENGTH) {
+            return "Food description must be between 1 and " + MAX_DESCRIPTION_LENGTH + " characters.";
+        }
+        if (meal.length() > MAX_MEAL_NAME_LENGTH) {
+            return "Meal name is too long.";
+        }
+        if (calories < 0 || calories > 5000 || protein < 0 || protein > 500
+                || carbs < 0 || carbs > 1000 || fat < 0 || fat > 500) {
+            return "Those macro values are out of range.";
+        }
+
+        // Remember the browser's timezone so "today" means the client's day, not the server's.
+        if (timezone != null && !timezone.isBlank() && !timezone.equals(user.getTimezone())) {
+            try {
+                ZoneId.of(timezone);
+                user.setTimezone(timezone);
+                userRepository.save(user);
+            } catch (Exception ignore) {}
+        }
+        ZoneId zone = foodLogService.zoneFor(user);
+
         FoodLog foodLog = new FoodLog();
         foodLog.setUser(user);
-        foodLog.setMealName(mealName);
-        foodLog.setFoodDescription(foodDescription);
+        foodLog.setMealName(meal);
+        foodLog.setFoodDescription(description);
         foodLog.setCalories(calories);
         foodLog.setProtein(protein);
         foodLog.setCarbs(carbs);
         foodLog.setFat(fat);
-        foodLog.setFromMealPlan(true);
-        try {
-            java.time.ZoneId zone = (timezone != null && !timezone.isBlank()) ? java.time.ZoneId.of(timezone) : java.time.ZoneId.systemDefault();
-            foodLog.setLogDate(java.time.LocalDate.now(zone));
-            foodLog.setTimeLogged(java.time.LocalDateTime.now(zone));
-        } catch (Exception ignore) {}
+        foodLog.setFromMealPlan(fromMealPlan);
+        foodLog.setLogDate(LocalDate.now(zone));
+        foodLog.setTimeLogged(LocalDateTime.now(zone));
         foodLogService.addFoodLog(foodLog);
-        redirectAttributes.addFlashAttribute("success", "Meal logged successfully!");
-        return "redirect:/dashboard";
+        return null;
     }
 
     @PostMapping("/delete/{id}")
-    public String deleteFoodLog(@PathVariable Long id, RedirectAttributes redirectAttributes) {
+    public String deleteFoodLog(@AuthenticationPrincipal OAuth2User principal,
+                                @PathVariable Long id,
+                                RedirectAttributes redirectAttributes) {
+        User user = currentUserService.require(principal);
+        FoodLog foodLog = foodLogService.getFoodLogById(id);
+        // Same response for "missing" and "not yours" so IDs cannot be probed.
+        if (foodLog == null || !foodLog.getUser().getId().equals(user.getId())) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+        }
         foodLogService.deleteFoodLog(id);
         redirectAttributes.addFlashAttribute("success", "Food log deleted!");
         return "redirect:/dashboard";
@@ -97,49 +145,67 @@ public class FoodLogController {
 
     @PostMapping("/random-suggestion")
     @ResponseBody
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> getRandomSuggestion(
+    @SuppressWarnings("unchecked")
+    public ResponseEntity<Map<String, Object>> getRandomSuggestion(
+            @AuthenticationPrincipal OAuth2User principal,
             @RequestParam(required = false) Integer targetCalories) {
-        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        User user = currentUserService.require(principal);
+        Map<String, Object> response = new HashMap<>();
         try {
+            boolean offline = currentUserService.isDemo(user);
+            if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
             if (targetCalories == null) targetCalories = 500;
-            java.util.Map<String, Object> suggestion = foodLogService.generateRandomHealthyMeal(targetCalories);
+            targetCalories = Math.max(100, Math.min(2000, targetCalories));
+            Map<String, Object> suggestion = foodLogService.generateRandomHealthyMeal(targetCalories, offline);
             if (suggestion == null) {
                 response.put("success", false);
                 response.put("error", "Could not generate suggestion.");
-                return org.springframework.http.ResponseEntity.ok(response);
+                return ResponseEntity.ok(response);
             }
             response.put("success", true);
             response.put("foodDescription", suggestion.get("description"));
+            response.put("ingredients", suggestion.get("ingredients"));
+            response.put("steps", suggestion.get("steps"));
+            // What gets saved if they log it: the dish name plus what went into it.
+            String logDescription = suggestion.get("description") + " (" + String.join(", ", (List<String>) suggestion.get("ingredients")) + ")";
+            if (logDescription.length() > MAX_DESCRIPTION_LENGTH) logDescription = logDescription.substring(0, MAX_DESCRIPTION_LENGTH);
+            response.put("logDescription", logDescription);
             response.put("calories", suggestion.get("calories"));
             response.put("protein", suggestion.get("protein"));
             response.put("carbs", suggestion.get("carbs"));
             response.put("fat", suggestion.get("fat"));
-            return org.springframework.http.ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
+        } catch (AiQuotaService.QuotaExceededException e) {
+            return quotaResponse(e);
         } catch (Exception e) {
             response.put("success", false);
             response.put("error", "Error generating suggestion.");
-            return org.springframework.http.ResponseEntity.status(500).body(response);
+            return ResponseEntity.status(500).body(response);
         }
     }
 
     @PostMapping("/estimate-with-alternative")
     @ResponseBody
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> estimateWithAlternative(
+    public ResponseEntity<Map<String, Object>> estimateWithAlternative(
+            @AuthenticationPrincipal OAuth2User principal,
             @RequestParam String foodDescription) {
-        java.util.Map<String, Object> response = new java.util.HashMap<>();
+        User user = currentUserService.require(principal);
+        Map<String, Object> response = new HashMap<>();
         try {
-            java.util.Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(foodDescription);
+            boolean offline = currentUserService.isDemo(user);
+            if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
+            Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(foodDescription, offline);
             if (macros == null) {
                 response.put("success", false);
                 response.put("error", "Please enter a valid food description.");
-                return org.springframework.http.ResponseEntity.ok(response);
+                return ResponseEntity.ok(response);
             }
             response.put("success", true);
             response.put("calories", macros.get("calories"));
             response.put("protein", macros.get("protein"));
             response.put("carbs", macros.get("carbs"));
             response.put("fat", macros.get("fat"));
-            String healthier = foodLogService.suggestHealthierAlternative(
+            String healthier = offline ? null : foodLogService.suggestHealthierAlternative(
                     foodDescription,
                     macros.get("calories"),
                     macros.get("protein"),
@@ -149,20 +215,22 @@ public class FoodLogController {
             if (healthier != null && !healthier.isBlank()) {
                 response.put("healthierAlternative", healthier);
             }
-            return org.springframework.http.ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
+        } catch (AiQuotaService.QuotaExceededException e) {
+            return quotaResponse(e);
         } catch (Exception e) {
             response.put("success", false);
             response.put("error", "Could not estimate macros.");
-            return org.springframework.http.ResponseEntity.status(500).body(response);
+            return ResponseEntity.status(500).body(response);
         }
     }
 
     @GetMapping("/history")
-    public String viewHistory(@AuthenticationPrincipal OAuth2User principal, Model model) {
-        User user = resolveUser(principal);
+    public String viewHistory(@AuthenticationPrincipal OAuth2User principal, HttpSession session, Model model) {
+        User user = currentUserService.requireForView(principal, session);
         List<FoodLog> last7Days = foodLogService.getLast7DaysFoodLogs(user);
         Map<LocalDate, Map<String, Integer>> dailyTotalsMap = new HashMap<>();
-        LocalDate today = LocalDate.now();
+        LocalDate today = foodLogService.today(user);
         for (int i = 0; i < 7; i++) {
             LocalDate date = today.minusDays(i);
             dailyTotalsMap.put(date, foodLogService.calculateDailyTotals(user, date));
@@ -173,38 +241,41 @@ public class FoodLogController {
         return "food-log-history";
     }
 
-    private User resolveUser(OAuth2User principal) {
-        if (principal == null) throw new RuntimeException("Not authenticated");
-        String email = principal.getAttribute("email");
-        String googleId = principal.getAttribute("sub");
-        User user = null;
-        if (email != null) user = userRepository.findByEmail(email).orElse(null);
-        if (user == null && googleId != null) user = userRepository.findByGoogleId(googleId).orElse(null);
-        if (user == null) throw new RuntimeException("User not found");
-        return user;
-    }
-
     @PostMapping("/estimate-macros")
     @ResponseBody
-    public org.springframework.http.ResponseEntity<java.util.Map<String, Object>> estimateMacros(@RequestParam String foodDescription) {
-        java.util.Map<String, Object> response = new java.util.HashMap<>();
+    public ResponseEntity<Map<String, Object>> estimateMacros(
+            @AuthenticationPrincipal OAuth2User principal,
+            @RequestParam String foodDescription) {
+        User user = currentUserService.require(principal);
+        Map<String, Object> response = new HashMap<>();
         try {
-            java.util.Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(foodDescription);
+            boolean offline = currentUserService.isDemo(user);
+            if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
+            Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(foodDescription, offline);
             if (macros == null) {
                 response.put("success", false);
                 response.put("error", "Please enter a valid food description.");
-                return org.springframework.http.ResponseEntity.ok(response);
+                return ResponseEntity.ok(response);
             }
             response.put("success", true);
             response.put("calories", macros.get("calories"));
             response.put("protein", macros.get("protein"));
             response.put("carbs", macros.get("carbs"));
             response.put("fat", macros.get("fat"));
-            return org.springframework.http.ResponseEntity.ok(response);
+            return ResponseEntity.ok(response);
+        } catch (AiQuotaService.QuotaExceededException e) {
+            return quotaResponse(e);
         } catch (Exception e) {
             response.put("success", false);
             response.put("error", "Couldn't estimate macros. Please enter them manually.");
-            return org.springframework.http.ResponseEntity.status(500).body(response);
+            return ResponseEntity.status(500).body(response);
         }
+    }
+
+    private ResponseEntity<Map<String, Object>> quotaResponse(AiQuotaService.QuotaExceededException e) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("success", false);
+        response.put("error", e.getMessage());
+        return ResponseEntity.ok(response);
     }
 }

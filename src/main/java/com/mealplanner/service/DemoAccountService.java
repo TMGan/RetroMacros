@@ -17,6 +17,7 @@ import com.mealplanner.repository.UserRepository;
 import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -34,6 +35,9 @@ public class DemoAccountService {
     public static final String DEMO_EMAIL = "demo@retromacros.app";
     public static final String DEMO_GOOGLE_ID = "demo-account";
     public static final String DEMO_NAME = "Demo User";
+    private static final long RESET_COOLDOWN_SECONDS = 20;
+
+    private volatile Instant lastReset;
 
     private final UserRepository userRepository;
     private final FoodLogRepository foodLogRepository;
@@ -66,8 +70,15 @@ public class DemoAccountService {
     /** Returns the demo user, freshly reset to a known-good state. */
     @Transactional
     public User resetAndGet() {
-        User demo = userRepository.findByEmail(DEMO_EMAIL)
-                .orElseGet(() -> new User(DEMO_EMAIL, DEMO_NAME, DEMO_GOOGLE_ID));
+        // The button is public, so do not let rapid clicks hammer the database.
+        User existing = userRepository.findByEmail(DEMO_EMAIL).orElse(null);
+        Instant now = Instant.now();
+        if (existing != null && lastReset != null && now.isBefore(lastReset.plusSeconds(RESET_COOLDOWN_SECONDS))) {
+            return existing;
+        }
+        lastReset = now;
+
+        User demo = existing != null ? existing : new User(DEMO_EMAIL, DEMO_NAME, DEMO_GOOGLE_ID);
         demo.setName(DEMO_NAME);
         demo.setAdmin(false);
         demo.setLastLoginAt(LocalDateTime.now());
@@ -153,7 +164,7 @@ public class DemoAccountService {
         saved.setTargetFat(targets.getFat());
 
         try {
-            MealPlan plan = mealPlanService.generateMealPlan(profile, targets);
+            MealPlan plan = mealPlanService.generateSampleMealPlan(profile, targets);
             GroceryList groceries = mealPlanService.generateGroceryList(plan);
             saved.setMealPlanJson(mapper.writeValueAsString(plan));
             saved.setGroceryListJson(mapper.writeValueAsString(groceries));

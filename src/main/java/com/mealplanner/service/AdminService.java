@@ -7,6 +7,7 @@ import com.mealplanner.repository.FoodLogRepository;
 import com.mealplanner.repository.SavedMealPlanRepository;
 import com.mealplanner.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -18,10 +19,22 @@ public class AdminService {
     private final UserRepository userRepository;
     private final SavedMealPlanRepository savedMealPlanRepository;
     private final FoodLogRepository foodLogRepository;
+    private final com.mealplanner.repository.SwapHistoryRepository swapHistoryRepository;
+    private final com.mealplanner.repository.LearnedUserPreferenceRepository learnedUserPreferenceRepository;
+    private final com.mealplanner.repository.UserFoodPreferencesRepository userFoodPreferencesRepository;
+    private final com.mealplanner.repository.AiUsageRepository aiUsageRepository;
 
     public AdminService(UserRepository userRepository,
                         SavedMealPlanRepository savedMealPlanRepository,
-                        FoodLogRepository foodLogRepository) {
+                        FoodLogRepository foodLogRepository,
+                        com.mealplanner.repository.SwapHistoryRepository swapHistoryRepository,
+                        com.mealplanner.repository.LearnedUserPreferenceRepository learnedUserPreferenceRepository,
+                        com.mealplanner.repository.UserFoodPreferencesRepository userFoodPreferencesRepository,
+                        com.mealplanner.repository.AiUsageRepository aiUsageRepository) {
+        this.swapHistoryRepository = swapHistoryRepository;
+        this.learnedUserPreferenceRepository = learnedUserPreferenceRepository;
+        this.userFoodPreferencesRepository = userFoodPreferencesRepository;
+        this.aiUsageRepository = aiUsageRepository;
         this.userRepository = userRepository;
         this.savedMealPlanRepository = savedMealPlanRepository;
         this.foodLogRepository = foodLogRepository;
@@ -147,11 +160,18 @@ public class AdminService {
         return userRepository.findByEmailContainingIgnoreCaseOrNameContainingIgnoreCase(query, query);
     }
 
+    /** Deletes a user and every record that belongs to them. */
+    @Transactional
     public void deleteUser(Long userId) {
         User user = userRepository.findById(userId).orElseThrow(() -> new RuntimeException("User not found"));
-        // FoodLogs and SavedMealPlans are cascaded on User? SavedMealPlan has ManyToOne without cascade from User
-        // Be explicit: delete child records via repositories
-        // Note: There is no repository method to bulk delete by user; keep as-is for now or rely on orphanRemoval on User.savedMealPlans
+        // Food logs first: they hold an FK to saved meal plans.
+        foodLogRepository.deleteAll(foodLogRepository.findByUserAndLogDateBetweenOrderByLogDateDescTimeLoggedAsc(
+                user, LocalDate.of(1970, 1, 1), LocalDate.now().plusYears(1)));
+        swapHistoryRepository.deleteAll(swapHistoryRepository.findByUserOrderBySwapDateDesc(user));
+        learnedUserPreferenceRepository.deleteAll(learnedUserPreferenceRepository.findByUserOrderByConfidenceScoreDesc(user));
+        userFoodPreferencesRepository.findByUser(user).ifPresent(userFoodPreferencesRepository::delete);
+        aiUsageRepository.deleteAll(aiUsageRepository.findByUser(user));
+        // Saved meal plans go with the user (orphanRemoval on User.savedMealPlans).
         userRepository.delete(user);
     }
 }
