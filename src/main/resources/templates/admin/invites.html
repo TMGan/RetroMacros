@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invites | Admin</title>
+    <link rel="stylesheet" th:href="@{/css/admin.css}">
+</head>
+<body class="admin">
+<div class="admin-header">
+    <h1>⚡ INVITES</h1>
+    <nav class="admin-nav">
+        <a href="/admin">Dashboard</a>
+        <a href="/admin/users">Users</a>
+        <a href="/admin/invites" class="active">Invites</a>
+        <a href="/admin/meal-plans">Meal Plans</a>
+        <a href="/admin/food-logs">Food Logs</a>
+        <a href="/admin/ai-accuracy">AI Accuracy</a>
+    </nav>
+</div>
+<div class="admin-container">
+    <p th:if="${param.invalid}" class="badge badge-danger">That does not look like an email address.</p>
+    <p th:if="${param.added}" class="badge badge-success">Invite saved.</p>
+    <p th:if="${param.removed}" class="badge badge-warning">Invite removed.</p>
+
+    <div class="search-bar">
+        <form th:action="@{/admin/invites}" method="post">
+            <input type="email" name="email" placeholder="client@gmail.com" maxlength="254" required autocomplete="off">
+            <input type="text" name="note" placeholder="Note (optional)" maxlength="200" autocomplete="off">
+            <button type="submit" class="btn-admin btn-success">Invite</button>
+        </form>
+    </div>
+    <p style="opacity:.7; font-size:13px;">Only these Google accounts can sign in. Removing one blocks the next sign-in; it does not delete the client's data.</p>
+
+    <div class="admin-table-container">
+        <table class="admin-table">
+            <thead>
+                <tr><th>Email</th><th>Note</th><th>Invited</th><th>Actions</th></tr>
+            </thead>
+            <tbody>
+            <tr th:each="invite : ${invites}">
+                <td th:text="${invite.email}">client@example.com</td>
+                <td th:text="${invite.note}">note</td>
+                <td th:text="${#temporals.format(invite.invitedAt, 'yyyy-MM-dd')}">date</td>
+                <td>
+                    <form th:action="@{/admin/invites/{id}/delete(id=${invite.id})}" method="post" style="display:inline">
+                        <button type="submit" class="btn-admin btn-danger" data-confirm="Click again to remove">Remove</button>
+                    </form>
+                </td>
+            </tr>
+            </tbody>
+        </table>
+        <div th:if="${#lists.isEmpty(invites)}" style="text-align:center; padding: 30px; opacity:.6;">No invites yet.</div>
+    </div>
+</div>
+<script th:src="@{/js/confirm-click.js}"></script>
+</body>
+</html>

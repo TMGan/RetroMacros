@@ -204,7 +204,8 @@
         ingList.innerHTML = '';
         ingredients.forEach(i => {
             const li = document.createElement('li');
-            li.innerHTML = '<i class="bi bi-dot"></i> ' + i;
+            li.innerHTML = '<i class="bi bi-dot"></i> ';
+            li.appendChild(document.createTextNode(i));
             ingList.appendChild(li);
         });
         const instrList = document.getElementById('recipeInstructions');
@@ -248,6 +249,7 @@
         body.set('protein', String(pro));
         body.set('carbs', String(carbs));
         body.set('fat', String(fat));
+        body.set('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC');
         fetch('/food-log/quick-add', {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded', [csrf.header]: csrf.token },
@@ -370,7 +372,7 @@
         // For now we don't have per-item macros; request with rough meal-level defaults
         fetch('/swap/ingredient-options', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', [getCsrf().header]: getCsrf().token },
             body: `originalFood=${encodeURIComponent(original)}&calories=0&protein=0&carbs=0&fat=0`
         }).then(r => r.json()).then(data => {
             const list = document.getElementById('swapOptionsList');
@@ -395,7 +397,7 @@
         // Backend record only; UI mutation of parsed results is non-trivial here
         fetch('/swap/record', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded', [getCsrf().header]: getCsrf().token },
             body: `swapType=ingredient&originalFood=${encodeURIComponent(originalFood)}&replacementFood=${encodeURIComponent(replacement)}&mealContext=${encodeURIComponent(mealId)}`
         });
         bootstrap.Modal.getInstance(document.getElementById('swapIngredientModal')).hide();

@@ -12,6 +12,7 @@
     <nav class="admin-nav">
         <a href="/admin">Dashboard</a>
         <a href="/admin/users" class="active">Users</a>
+        <a href="/admin/invites">Invites</a>
         <a href="/admin/meal-plans">Meal Plans</a>
         <a href="/admin/food-logs">Food Logs</a>
     </nav>
@@ -69,11 +70,12 @@
         </form>
         <a th:href="@{/admin/meal-plans(userId=${user.id})}" class="btn-admin">View Their Meal Plans</a>
         <a th:href="@{/admin/food-logs(userId=${user.id})}" class="btn-admin">View Their Food Logs</a>
-        <form th:action="@{/admin/users/{id}/delete(id=${user.id})}" method="post" style="display:inline" onsubmit="return confirm('Delete this user and all data?')">
-            <button type="submit" class="btn-admin btn-danger">🗑️ Delete User</button>
+        <form th:action="@{/admin/users/{id}/delete(id=${user.id})}" method="post" style="display:inline">
+            <button type="submit" class="btn-admin btn-danger" data-confirm="Click again to delete this user and all data">🗑️ Delete User</button>
         </form>
     </div>
 </div>
+<script th:src="@{/js/confirm-click.js}"></script>
 </body>
 </html>
 

@@ -1,10 +1,16 @@
 package com.mealplanner.config;
 
 import com.mealplanner.service.CustomOAuth2UserService;
+import com.mealplanner.service.UserProvisioningService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;
+import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
+import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
+import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
 
 @Configuration
@@ -12,23 +18,35 @@ import org.springframework.security.web.SecurityFilterChain;
 public class SecurityConfig {
 
     private final CustomOAuth2UserService customOAuth2UserService;
+    private final UserProvisioningService userProvisioningService;
+    private final boolean h2ConsoleEnabled;
 
-    public SecurityConfig(CustomOAuth2UserService customOAuth2UserService) {
+    public SecurityConfig(CustomOAuth2UserService customOAuth2UserService,
+                          UserProvisioningService userProvisioningService,
+                          @Value("${spring.h2.console.enabled:false}") boolean h2ConsoleEnabled) {
         this.customOAuth2UserService = customOAuth2UserService;
+        this.userProvisioningService = userProvisioningService;
+        this.h2ConsoleEnabled = h2ConsoleEnabled;
     }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/home", "/about", "/login", "/error", "/webjars/**", "/css/**", "/images/**", "/oauth2/**", "/login/oauth2/**", "/demo-login").permitAll()
-                .requestMatchers("/h2-console/**").permitAll()
-                .anyRequest().authenticated()
-            )
+            .authorizeHttpRequests(auth -> {
+                auth.requestMatchers("/", "/home", "/about", "/login", "/error", "/webjars/**", "/css/**", "/js/**", "/images/**", "/oauth2/**", "/login/oauth2/**", "/demo-login").permitAll();
+                if (h2ConsoleEnabled) {
+                    auth.requestMatchers("/h2-console/**").permitAll();
+                }
+                auth.anyRequest().authenticated();
+            })
             .oauth2Login(oauth2 -> oauth2
                 .loginPage("/login")
                 .defaultSuccessUrl("/dashboard", true)
-                .userInfoEndpoint(userInfo -> userInfo.userService(customOAuth2UserService))
+                // Google sign-in requests the openid scope, so it goes through the
+                // OIDC service. Both services run the same invite check.
+                .userInfoEndpoint(userInfo -> userInfo
+                    .userService(customOAuth2UserService)
+                    .oidcUserService(oidcUserService()))
             )
             .logout(logout -> logout
                 .logoutUrl("/logout")
@@ -36,16 +54,22 @@ public class SecurityConfig {
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
             )
-            .csrf(csrf -> csrf.ignoringRequestMatchers(
-                "/h2-console/**",
-                "/food-log/estimate-macros",
-                "/food-log/random-suggestion",
-                "/food-log/estimate-with-alternative",
-                "/swap/ingredient-options",
-                "/swap/record"
-            ))
             .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
 
+        if (h2ConsoleEnabled) {
+            http.csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"));
+        }
+
         return http.build();
+    }
+
+    private OAuth2UserService<OidcUserRequest, OidcUser> oidcUserService() {
+        OidcUserService delegate = new OidcUserService();
+        return userRequest -> {
+            OidcUser oidcUser = delegate.loadUser(userRequest);
+            userProvisioningService.onLogin(
+                    oidcUser.getEmail(), oidcUser.getFullName(), oidcUser.getSubject(), oidcUser.getPicture());
+            return oidcUser;
+        };
     }
 }

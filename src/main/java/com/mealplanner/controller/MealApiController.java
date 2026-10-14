@@ -2,8 +2,15 @@ package com.mealplanner.controller;
 
 import com.mealplanner.model.MacroTargets;
 import com.mealplanner.model.Meal;
+import com.mealplanner.model.User;
+import com.mealplanner.service.AiQuotaService;
+import com.mealplanner.service.CurrentUserService;
 import com.mealplanner.service.MealPlanService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -12,10 +19,19 @@ import java.util.Map;
 @RequestMapping("/api/meal")
 public class MealApiController {
 
-    private final MealPlanService mealPlanService;
+    private static final Logger log = LoggerFactory.getLogger(MealApiController.class);
+    private static final int MAX_HINT_LENGTH = 120;
 
-    public MealApiController(MealPlanService mealPlanService) {
+    private final MealPlanService mealPlanService;
+    private final CurrentUserService currentUserService;
+    private final AiQuotaService aiQuotaService;
+
+    public MealApiController(MealPlanService mealPlanService,
+                             CurrentUserService currentUserService,
+                             AiQuotaService aiQuotaService) {
         this.mealPlanService = mealPlanService;
+        this.currentUserService = currentUserService;
+        this.aiQuotaService = aiQuotaService;
     }
 
     public static class SwapMealRequest {
@@ -27,22 +43,41 @@ public class MealApiController {
     }
 
     @PostMapping("/swap")
-    public ResponseEntity<?> swapMeal(@RequestBody SwapMealRequest req) {
+    public ResponseEntity<?> swapMeal(@AuthenticationPrincipal OAuth2User principal,
+                                      @RequestBody SwapMealRequest req) {
+        User user = currentUserService.require(principal);
+        if (req.targetCalories < 0 || req.targetCalories > 3000 || req.targetProtein < 0 || req.targetProtein > 300
+                || req.targetCarbs < 0 || req.targetCarbs > 500 || req.targetFat < 0 || req.targetFat > 200) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Macro targets are out of range"));
+        }
+        if (mealPlanService.isMockMode() || currentUserService.isDemo(user)) {
+            return ResponseEntity.status(503).body(Map.of("error", "Meal swap is not available in demo mode"));
+        }
         try {
+            aiQuotaService.consume(user, AiQuotaService.Kind.SWAP);
             MacroTargets target = new MacroTargets(
                     req.targetCalories,
                     req.targetProtein,
                     req.targetCarbs,
                     req.targetFat
             );
-            Meal replacement = mealPlanService.generateReplacementMeal(target, req.avoidSimilarTo);
+            Meal replacement = mealPlanService.generateReplacementMeal(target, cleanHint(req.avoidSimilarTo));
             if (replacement == null) {
                 return ResponseEntity.status(502).body(Map.of("error", "Could not generate replacement meal"));
             }
             return ResponseEntity.ok(replacement);
+        } catch (AiQuotaService.QuotaExceededException e) {
+            return ResponseEntity.status(429).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of("error", e.getMessage()));
+            log.warn("Meal swap failed for user {}", user.getId(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Could not generate replacement meal"));
         }
     }
-}
 
+    // The hint is pasted into the AI prompt, so keep it short and single-line.
+    private String cleanHint(String hint) {
+        if (hint == null) return null;
+        String cleaned = hint.replaceAll("[\\r\\n\\t]+", " ").trim();
+        return cleaned.length() > MAX_HINT_LENGTH ? cleaned.substring(0, MAX_HINT_LENGTH) : cleaned;
+    }
+}

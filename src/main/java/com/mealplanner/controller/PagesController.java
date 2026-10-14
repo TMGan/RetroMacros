@@ -19,7 +19,10 @@ public class PagesController {
     private final UserRepository userRepository;
     private final SavedMealPlanRepository savedMealPlanRepository;
 
-    public PagesController(UserRepository userRepository, SavedMealPlanRepository savedMealPlanRepository) {
+    private final com.mealplanner.service.CurrentUserService currentUserService;
+
+    public PagesController(UserRepository userRepository, SavedMealPlanRepository savedMealPlanRepository, com.mealplanner.service.CurrentUserService currentUserService) {
+        this.currentUserService = currentUserService;
         this.userRepository = userRepository;
         this.savedMealPlanRepository = savedMealPlanRepository;
     }
@@ -30,14 +33,9 @@ public class PagesController {
     }
 
     @GetMapping("/profile")
-    public String profile(@AuthenticationPrincipal OAuth2User principal, Model model) {
+    public String profile(@AuthenticationPrincipal OAuth2User principal, jakarta.servlet.http.HttpSession session, Model model) {
         if (principal == null) return "redirect:/login";
-        String email = principal.getAttribute("email");
-        String googleId = principal.getAttribute("sub");
-        User user = null;
-        if (email != null) user = userRepository.findByEmail(email).orElse(null);
-        if (user == null && googleId != null) user = userRepository.findByGoogleId(googleId).orElse(null);
-        if (user == null) return "redirect:/login";
+        User user = currentUserService.requireForView(principal, session);
 
         long totalPlans = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(user).size();
         long daysAsMember = 0;
@@ -66,14 +64,9 @@ public class PagesController {
     }
 
     @GetMapping("/my-plans")
-    public String myPlans(@AuthenticationPrincipal OAuth2User principal, Model model) {
+    public String myPlans(@AuthenticationPrincipal OAuth2User principal, jakarta.servlet.http.HttpSession session, Model model) {
         if (principal == null) return "redirect:/login";
-        String email = principal.getAttribute("email");
-        String googleId = principal.getAttribute("sub");
-        User user = null;
-        if (email != null) user = userRepository.findByEmail(email).orElse(null);
-        if (user == null && googleId != null) user = userRepository.findByGoogleId(googleId).orElse(null);
-        if (user == null) return "redirect:/login";
+        User user = currentUserService.requireForView(principal, session);
 
         List<SavedMealPlan> allPlans = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(user);
         model.addAttribute("user", user);

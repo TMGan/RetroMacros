@@ -3,6 +3,10 @@ package com.mealplanner.controller;
 import com.mealplanner.model.FoodLog;
 import com.mealplanner.model.SavedMealPlan;
 import com.mealplanner.model.User;
+import com.mealplanner.model.AdminAuditLog;
+import com.mealplanner.model.AllowedEmail;
+import com.mealplanner.repository.AdminAuditLogRepository;
+import com.mealplanner.repository.AllowedEmailRepository;
 import com.mealplanner.repository.FoodLogRepository;
 import com.mealplanner.repository.SavedMealPlanRepository;
 import com.mealplanner.repository.UserRepository;
@@ -29,11 +33,17 @@ public class AdminController {
     private final UserRepository userRepository;
     private final SavedMealPlanRepository savedMealPlanRepository;
     private final FoodLogRepository foodLogRepository;
+    private final AllowedEmailRepository allowedEmailRepository;
+    private final AdminAuditLogRepository auditLogRepository;
 
     public AdminController(AdminService adminService,
                            UserRepository userRepository,
                            SavedMealPlanRepository savedMealPlanRepository,
-                           FoodLogRepository foodLogRepository) {
+                           FoodLogRepository foodLogRepository,
+                           AllowedEmailRepository allowedEmailRepository,
+                           AdminAuditLogRepository auditLogRepository) {
+        this.allowedEmailRepository = allowedEmailRepository;
+        this.auditLogRepository = auditLogRepository;
         this.adminService = adminService;
         this.userRepository = userRepository;
         this.savedMealPlanRepository = savedMealPlanRepository;
@@ -120,7 +130,12 @@ public class AdminController {
     public String deleteUser(@AuthenticationPrincipal OAuth2User principal,
                              @PathVariable Long userId) {
         requireAdmin(principal);
+        User admin = getCurrentUser(principal);
+        if (admin.getId().equals(userId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You cannot delete your own account here");
+        }
         adminService.deleteUser(userId);
+        auditLogRepository.save(new AdminAuditLog(admin.getEmail(), "DELETE_USER", "user:" + userId));
         return "redirect:/admin/users?deleted=true";
     }
 
@@ -134,6 +149,8 @@ public class AdminController {
         session.setAttribute("originalAdminId", admin != null ? admin.getId() : null);
         session.setAttribute("impersonating", true);
         session.setAttribute("impersonateUserId", target.getId());
+        // Viewing a client account is read-only (ReadOnlyViewInterceptor) and always recorded.
+        auditLogRepository.save(new AdminAuditLog(admin.getEmail(), "VIEW_AS", "user:" + target.getId()));
         return "redirect:/dashboard";
     }
 
@@ -142,8 +159,45 @@ public class AdminController {
         if (Boolean.TRUE.equals(session.getAttribute("impersonating"))) {
             session.removeAttribute("impersonating");
             session.removeAttribute("impersonateUserId");
+            session.removeAttribute("originalAdminId");
         }
         return "redirect:/admin";
+    }
+
+    @GetMapping("/invites")
+    public String invites(@AuthenticationPrincipal OAuth2User principal, Model model) {
+        requireAdmin(principal);
+        model.addAttribute("invites", allowedEmailRepository.findAllByOrderByInvitedAtDesc());
+        return "admin/invites";
+    }
+
+    @PostMapping("/invites")
+    public String addInvite(@AuthenticationPrincipal OAuth2User principal,
+                            @RequestParam String email,
+                            @RequestParam(required = false) String note) {
+        requireAdmin(principal);
+        String cleaned = email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+        if (cleaned.length() > 254 || !cleaned.matches("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$")) {
+            return "redirect:/admin/invites?invalid=true";
+        }
+        if (!allowedEmailRepository.existsByEmailIgnoreCase(cleaned)) {
+            String cleanedNote = note == null ? null : note.trim();
+            if (cleanedNote != null && cleanedNote.length() > 200) cleanedNote = cleanedNote.substring(0, 200);
+            allowedEmailRepository.save(new AllowedEmail(cleaned, cleanedNote));
+            auditLogRepository.save(new AdminAuditLog(getCurrentUser(principal).getEmail(), "INVITE_ADD", cleaned));
+        }
+        return "redirect:/admin/invites?added=true";
+    }
+
+    @PostMapping("/invites/{inviteId}/delete")
+    public String removeInvite(@AuthenticationPrincipal OAuth2User principal,
+                               @PathVariable Long inviteId) {
+        requireAdmin(principal);
+        allowedEmailRepository.findById(inviteId).ifPresent(invite -> {
+            allowedEmailRepository.delete(invite);
+            auditLogRepository.save(new AdminAuditLog(getCurrentUser(principal).getEmail(), "INVITE_REMOVE", invite.getEmail()));
+        });
+        return "redirect:/admin/invites?removed=true";
     }
 
     @GetMapping("/meal-plans")
@@ -257,6 +311,8 @@ public class AdminController {
 
     private String escapeCSV(String value) {
         if (value == null) return "";
+        // Stop spreadsheet apps from running a cell that starts like a formula.
+        if (!value.isEmpty() && "=+-@".indexOf(value.charAt(0)) >= 0) value = "'" + value;
         if (value.contains(",") || value.contains("\"") || value.contains("\n")) {
             return "\"" + value.replace("\"", "\"\"") + "\"";
         }
