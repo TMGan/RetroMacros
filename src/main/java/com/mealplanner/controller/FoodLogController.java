@@ -156,7 +156,7 @@ public class FoodLogController {
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
             if (targetCalories == null) targetCalories = 500;
             targetCalories = Math.max(100, Math.min(2000, targetCalories));
-            Map<String, Object> suggestion = foodLogService.generateRandomHealthyMeal(targetCalories, offline);
+            Map<String, Object> suggestion = foodLogService.generateRandomHealthyMeal(user, targetCalories, offline);
             if (suggestion == null) {
                 response.put("success", false);
                 response.put("error", "Could not generate suggestion.");
@@ -194,7 +194,7 @@ public class FoodLogController {
         try {
             boolean offline = currentUserService.isDemo(user);
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
-            Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(foodDescription, offline);
+            Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(user, foodDescription, offline);
             if (macros == null) {
                 response.put("success", false);
                 response.put("error", "Please enter a valid food description.");
@@ -206,6 +206,7 @@ public class FoodLogController {
             response.put("carbs", macros.get("carbs"));
             response.put("fat", macros.get("fat"));
             String healthier = offline ? null : foodLogService.suggestHealthierAlternative(
+                    user,
                     foodDescription,
                     macros.get("calories"),
                     macros.get("protein"),
@@ -251,7 +252,7 @@ public class FoodLogController {
         try {
             boolean offline = currentUserService.isDemo(user);
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
-            Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(foodDescription, offline);
+            Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(user, foodDescription, offline);
             if (macros == null) {
                 response.put("success", false);
                 response.put("error", "Please enter a valid food description.");

@@ -149,9 +149,9 @@ public class MainController {
                 String learnedExtra = swapService.buildLearnedPreferencesPrompt(user);
                 String combinedExtra = (preferencesExtra == null ? "" : preferencesExtra) + (learnedExtra == null ? "" : learnedExtra);
                 if (!combinedExtra.isBlank()) {
-                    mealPlan = mealPlanService.generateMealPlan(profile, targets, combinedExtra);
+                    mealPlan = mealPlanService.generateMealPlan(user, profile, targets, combinedExtra);
                 } else {
-                    mealPlan = mealPlanService.generateMealPlan(profile, targets);
+                    mealPlan = mealPlanService.generateMealPlan(user, profile, targets);
                 }
             }
             GroceryList groceryList = mealPlanService.generateGroceryList(mealPlan);
