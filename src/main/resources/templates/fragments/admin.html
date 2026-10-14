@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <!-- Shared <head> for admin pages: same stylesheets as the main app. -->
+    <th:block th:fragment="adminHead(title)">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title th:text="${title} + ' | Admin - Retro Macros'">Admin - Retro Macros</title>
+        <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Audiowide&display=swap" rel="stylesheet">
+        <link rel="stylesheet" th:href="@{/css/theme.css}" />
+        <link rel="stylesheet" th:href="@{/css/admin.css}" />
+    </th:block>
+</head>
+<body>
+
+<!-- Admin navbar. active = which tab to highlight. -->
+<th:block th:fragment="navbar(active)">
+    <nav class="navbar navbar-expand-lg navbar-dark neon">
+        <div class="container-fluid">
+            <a class="navbar-brand neon-brand" href="/admin"><strong>Retro Macros</strong> <span class="admin-tag">Admin</span></a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNav"
+                    aria-controls="adminNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="adminNav">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" th:classappend="${active == 'dashboard'} ? 'active'" href="/admin"><i class="bi bi-speedometer2"></i> Overview</a></li>
+                    <li class="nav-item"><a class="nav-link" th:classappend="${active == 'users'} ? 'active'" href="/admin/users"><i class="bi bi-people"></i> Clients</a></li>
+                    <li class="nav-item"><a class="nav-link" th:classappend="${active == 'invites'} ? 'active'" href="/admin/invites"><i class="bi bi-envelope-plus"></i> Invites</a></li>
+                    <li class="nav-item"><a class="nav-link" th:classappend="${active == 'plans'} ? 'active'" href="/admin/meal-plans"><i class="bi bi-journal-text"></i> Meal Plans</a></li>
+                    <li class="nav-item"><a class="nav-link" th:classappend="${active == 'logs'} ? 'active'" href="/admin/food-logs"><i class="bi bi-list-check"></i> Food Logs</a></li>
+                    <li class="nav-item"><a class="nav-link" th:classappend="${active == 'accuracy'} ? 'active'" href="/admin/ai-accuracy"><i class="bi bi-bullseye"></i> AI Accuracy</a></li>
+                </ul>
+                <ul class="navbar-nav">
+                    <li class="nav-item"><a class="nav-link" href="/dashboard"><i class="bi bi-arrow-left-circle"></i> Back to app</a></li>
+                    <li class="nav-item">
+                        <form th:action="@{/logout}" method="post" class="d-inline">
+                            <button type="submit" class="nav-link btn btn-link"><i class="bi bi-box-arrow-right"></i> Logout</button>
+                        </form>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div th:if="${session.impersonating}" class="alert alert-warning text-center mb-0 rounded-0">
+        You are viewing a client account (read-only). <a href="/admin/exit-impersonation">Exit client view</a>
+    </div>
+</th:block>
+
+<!-- Scripts every admin page needs. -->
+<th:block th:fragment="scripts">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:src="@{/js/confirm-click.js}"></script>
+    <script>
+        // Rows with data-href open that page when clicked anywhere outside a button or link.
+        document.addEventListener('click', function (e) {
+            const row = e.target.closest('tr[data-href]');
+            if (!row || e.target.closest('a, button, form')) return;
+            window.location.href = row.dataset.href;
+        });
+    </script>
+</th:block>
+
+</body>
+</html>

@@ -4,10 +4,7 @@ import com.mealplanner.model.FoodLog;
 import com.mealplanner.model.User;
 import com.mealplanner.repository.FoodLogRepository;
 import org.springframework.core.env.Environment;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -20,7 +17,10 @@ public class FoodLogService {
     private final FoodLogRepository foodLogRepository;
     private final Environment env;
 
-    public FoodLogService(FoodLogRepository foodLogRepository, Environment env) {
+    private final AiClient aiClient;
+
+    public FoodLogService(FoodLogRepository foodLogRepository, Environment env, AiClient aiClient) {
+        this.aiClient = aiClient;
         this.foodLogRepository = foodLogRepository;
         this.env = env;
     }
@@ -98,12 +98,12 @@ public class FoodLogService {
      * Estimate macros from food description using AI.
      * Returns null if invalid or on errors per validation rules.
      */
-    public Map<String, Integer> estimateMacrosWithAI(String foodDescription) {
-        return estimateMacrosWithAI(foodDescription, false);
+    public Map<String, Integer> estimateMacrosWithAI(User user, String foodDescription) {
+        return estimateMacrosWithAI(user, foodDescription, false);
     }
 
     /** @param offline when true, never calls the paid API (used for the shared demo account) */
-    public Map<String, Integer> estimateMacrosWithAI(String foodDescription, boolean offline) {
+    public Map<String, Integer> estimateMacrosWithAI(User user, String foodDescription, boolean offline) {
         if (foodDescription == null) return null;
         String desc = foodDescription.trim();
         if (desc.isEmpty()) return null;
@@ -116,107 +116,12 @@ public class FoodLogService {
             if (offline || "true".equalsIgnoreCase(mock)) {
                 return estimateMacrosMock(desc);
             }
-            String aiResponse = callClaudeAPI(desc);
+            String aiResponse = aiClient.complete(user, AiClient.Kind.ESTIMATE, buildMacroEstimationPromptV2(desc));
             return parseMacroResponse(aiResponse);
         } catch (Exception e) {
             System.err.println("Error estimating macros: " + e.getMessage());
             return null;
         }
-    }
-
-    private String callClaudeAPI(String foodDescription) throws Exception {
-        return callClaude(buildMacroEstimationPromptV2(foodDescription), 200);
-    }
-
-    /** Sends one prompt as-is and returns the raw API response body. */
-    private String callClaude(String prompt, int maxTokens) throws Exception {
-        String apiKey = env.getProperty("ai.api.key");
-        // Support both ai.anthropic.url and ai.api.url keys
-        String apiUrl = env.getProperty("ai.anthropic.url", env.getProperty("ai.api.url"));
-        // Support both ai.anthropic.model and ai.api.model keys
-        String model = env.getProperty("ai.anthropic.model", env.getProperty("ai.api.model", "claude-3-5-sonnet-20241022"));
-
-        if (apiKey == null || apiUrl == null) {
-            throw new IllegalStateException("AI API configuration missing");
-        }
-
-
-        Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("model", model);
-        requestBody.put("max_tokens", maxTokens);
-        requestBody.put("messages", java.util.List.of(
-                java.util.Map.of("role", "user", "content", prompt)
-        ));
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("x-api-key", apiKey);
-        headers.set("anthropic-version", "2023-06-01");
-
-        HttpEntity<Map<String, Object>> request = new HttpEntity<>(requestBody, headers);
-
-        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        int timeout = 10_000;
-        try {
-            timeout = Integer.parseInt(env.getProperty("ai.timeout.ms", "10000"));
-        } catch (Exception ignore) {}
-        factory.setConnectTimeout(timeout);
-        factory.setReadTimeout(timeout);
-        RestTemplate restTemplate = new RestTemplate(factory);
-        ResponseEntity<String> response = restTemplate.postForEntity(apiUrl, request, String.class);
-        return response.getBody();
-    }
-
-    private String buildMacroEstimationPrompt(String foodDescription) {
-        return String.format(
-            "You are a nutrition expert who helps people track their macros in a realistic, non-judgmental way.\n\n" +
-            "Your job: Analyze a food description and estimate macros.\n\n" +
-            "IMPORTANT PHILOSOPHY:\n" +
-            "- Accept ALL legitimate foods: fast food, frozen meals, packaged items, restaurant meals, convenience foods\n" +
-            "- DO NOT judge food quality or suggest \"healthier\" alternatives\n" +
-            "- Respect user preferences (white rice > brown rice is fine!)\n" +
-            "- Goal is tracking macros, not lecturing about nutrition\n" +
-            "- When in doubt, accept it and estimate\n\n" +
-            "ONLY reject if the input is:\n" +
-            "1. Actually not food (car, phone, furniture, etc.)\n" +
-            "2. Inappropriate/offensive content\n" +
-            "3. Complete nonsensical gibberish\n" +
-            "4. Empty or meaningless\n\n" +
-            "If REJECTED, respond with: INVALID\n\n" +
-            "If ACCEPTED, estimate the macros and respond with ONLY these numbers in this exact format:\n" +
-            "calories,protein,carbs,fat\n\n" +
-            "EXAMPLES OF VALID INPUTS (accept these!):\n\n" +
-            "Fast Food:\n" +
-            "\"Chipotle chicken bowl white rice black beans\" → 650,45,70,18\n" +
-            "\"Big Mac and medium fries\" → 1080,28,120,54\n" +
-            "\"Subway 6-inch turkey sub\" → 280,18,46,4\n\n" +
-            "Frozen/Packaged:\n" +
-            "\"Hot Pocket pepperoni\" → 320,12,38,12\n" +
-            "\"Lean Cuisine chicken pasta\" → 280,18,40,5\n" +
-            "\"Quest protein bar chocolate chip\" → 200,20,22,9\n\n" +
-            "Casual/Vague:\n" +
-            "\"leftover pizza couple slices\" → 600,24,70,22\n" +
-            "\"some chicken and rice\" → 450,40,50,8\n" +
-            "\"idk breakfast stuff eggs and toast\" → 350,20,30,15\n\n" +
-            "Convenience:\n" +
-            "\"protein shake with banana\" → 280,30,35,4\n" +
-            "\"Greek yogurt and granola\" → 320,15,50,8\n" +
-            "\"deli sandwich\" → 400,25,45,12\n\n" +
-            "EXAMPLES OF INVALID INPUTS (reject these):\n\n" +
-            "Non-food:\n" +
-            "\"car\" → INVALID\n" +
-            "\"my phone\" → INVALID\n\n" +
-            "Inappropriate:\n" +
-            "\"penis\" → INVALID\n" +
-            "\"fuck\" → INVALID\n\n" +
-            "Gibberish:\n" +
-            "\"asdfghjkl\" → INVALID\n" +
-            "\"xxx\" → INVALID\n\n" +
-            "Now analyze this food description:\n" +
-            "\"%s\"\n\n" +
-            "Your response (either \"INVALID\" or \"calories,protein,carbs,fat\"):",
-            foodDescription
-        );
     }
 
     // Updated prompt focused on USDA accuracy and precise numeric-only output
@@ -241,7 +146,7 @@ public class FoodLogService {
     private Map<String, Integer> parseMacroResponse(String aiResponse) {
         if (aiResponse == null || aiResponse.isEmpty()) return null;
         try {
-            String content = extractContentFromAPIResponse(aiResponse);
+            String content = aiResponse;
             if (content == null || content.trim().isEmpty()) return null;
             if (content.trim().equalsIgnoreCase("INVALID")) return null;
 
@@ -264,20 +169,6 @@ public class FoodLogService {
             return null;
         } catch (Exception e) {
             System.err.println("Error parsing macro response: " + e.getMessage());
-            return null;
-        }
-    }
-
-    private String extractContentFromAPIResponse(String jsonResponse) {
-        try {
-            int textIndex = jsonResponse.indexOf("\"text\":");
-            if (textIndex == -1) return null;
-            int startQuote = jsonResponse.indexOf('"', textIndex + 7);
-            if (startQuote == -1) return null;
-            int endQuote = jsonResponse.indexOf('"', startQuote + 1);
-            if (endQuote == -1) return null;
-            return jsonResponse.substring(startQuote + 1, endQuote);
-        } catch (Exception e) {
             return null;
         }
     }
@@ -306,7 +197,7 @@ public class FoodLogService {
         return out;
     }
 
-    public String suggestHealthierAlternative(String originalFood, int calories, int protein, int carbs, int fat) {
+    public String suggestHealthierAlternative(User user, String originalFood, int calories, int protein, int carbs, int fat) {
         String lower = originalFood.toLowerCase();
         boolean needsAlt = lower.contains("hot pocket") || lower.contains("pizza") || lower.contains("mcdonald")
                 || lower.contains("burger king") || lower.contains("taco bell") || lower.contains("fast food")
@@ -315,8 +206,8 @@ public class FoodLogService {
         if ("true".equalsIgnoreCase(env.getProperty("ai.mock", "false"))) return null;
         try {
             String prompt = buildHealthierAlternativePrompt(originalFood, calories, protein, carbs, fat);
-            String resp = callClaude(prompt, 200);
-            return extractContentFromAPIResponse(resp);
+            String suggestion = aiClient.complete(user, AiClient.Kind.ALTERNATIVE, prompt).trim();
+            return suggestion.length() > 300 ? suggestion.substring(0, 300) : suggestion;
         } catch (Exception e) {
             return null;
         }
@@ -356,18 +247,18 @@ public class FoodLogService {
      * A meal idea with what goes in it and how to make it.
      * Keys: description, ingredients (List of String), steps (List of String), calories, protein, carbs, fat.
      */
-    public Map<String, Object> generateRandomHealthyMeal(int targetCalories) {
-        return generateRandomHealthyMeal(targetCalories, false);
+    public Map<String, Object> generateRandomHealthyMeal(User user, int targetCalories) {
+        return generateRandomHealthyMeal(user, targetCalories, false);
     }
 
-    public Map<String, Object> generateRandomHealthyMeal(int targetCalories, boolean offline) {
+    public Map<String, Object> generateRandomHealthyMeal(User user, int targetCalories, boolean offline) {
         try {
             String mock = env.getProperty("ai.mock", "false");
             if (offline || "true".equalsIgnoreCase(mock)) {
                 return randomMealMock(targetCalories);
             }
-            String aiResponse = callClaude(buildRandomMealPrompt(targetCalories), 700);
-            return parseRandomMealResponse(aiResponse);
+            String aiResponse = aiClient.complete(user, AiClient.Kind.SUGGESTION, buildRandomMealPrompt(targetCalories));
+            return parseRandomMealText(aiResponse);
         } catch (Exception e) {
             System.err.println("Error generating random meal: " + e.getMessage());
             return null;
@@ -394,9 +285,8 @@ public class FoodLogService {
     }
 
     // Package-private so the parsing can be tested without calling the API.
-    Map<String, Object> parseRandomMealResponse(String aiResponse) {
+    Map<String, Object> parseRandomMealText(String text) {
         try {
-            String text = extractText(aiResponse);
             if (text == null) return null;
             int start = text.indexOf('{');
             int end = text.lastIndexOf('}');
@@ -418,16 +308,6 @@ public class FoodLogService {
         } catch (Exception e) {
             return null;
         }
-    }
-
-    /** Pulls the text blocks out of a Messages API response body. */
-    private String extractText(String apiResponse) throws Exception {
-        if (apiResponse == null || apiResponse.isBlank()) return null;
-        StringBuilder sb = new StringBuilder();
-        for (com.fasterxml.jackson.databind.JsonNode block : JSON.readTree(apiResponse).path("content")) {
-            if ("text".equals(block.path("type").asText())) sb.append(block.path("text").asText(""));
-        }
-        return sb.length() == 0 ? null : sb.toString();
     }
 
     private List<String> readStrings(com.fasterxml.jackson.databind.JsonNode array, int max) {

@@ -2,18 +2,12 @@ package com.mealplanner.service;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mealplanner.model.*;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -21,44 +15,17 @@ import java.util.regex.Pattern;
 @Service
 public class MealPlanService {
 
-    private final WebClient webClient;
+    private final AiClient aiClient;
     private final ObjectMapper mapper;
-    private final String provider; // anthropic | openai
-    private final String anthropicUrl;
-    private final String openaiUrl;
-    private final String apiKey;
-    private final Duration timeout;
     private final boolean mockMode;
     private final boolean repairEnabled;
-    private final int maxTokens;
-    private final double temperature;
 
-    @Value("${ai.anthropic.model:claude-3-5-sonnet-latest}")
-    private String anthropicModel;
-
-    @Value("${ai.openai.model:gpt-4o}")
-    private String openaiModel;
-
-    public MealPlanService(WebClient.Builder builder,
-                           @Value("${ai.provider:anthropic}") String provider,
-                           @Value("${ai.anthropic.url:https://api.anthropic.com/v1/messages}") String anthropicUrl,
-                           @Value("${ai.openai.url:https://api.openai.com/v1/chat/completions}") String openaiUrl,
-                           @Value("${ai.api.key:}") String apiKey,
-                           @Value("${ai.timeout.ms:30000}") long timeoutMs,
+    public MealPlanService(AiClient aiClient,
                            @Value("${ai.mock:false}") boolean mockMode,
-                           @Value("${ai.repair.enabled:true}") boolean repairEnabled,
-                           @Value("${ai.max_tokens:6000}") int maxTokens,
-                           @Value("${ai.temperature:0.2}") double temperature) {
-        this.provider = provider;
-        this.anthropicUrl = anthropicUrl;
-        this.openaiUrl = openaiUrl;
-        this.apiKey = apiKey;
-        this.timeout = Duration.ofMillis(timeoutMs);
+                           @Value("${ai.repair.enabled:true}") boolean repairEnabled) {
+        this.aiClient = aiClient;
         this.mockMode = mockMode;
         this.repairEnabled = repairEnabled;
-        this.maxTokens = maxTokens;
-        this.temperature = temperature;
-        this.webClient = builder.build();
 
         this.mapper = new ObjectMapper()
                 .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
@@ -67,34 +34,18 @@ public class MealPlanService {
                 .configure(com.fasterxml.jackson.core.JsonParser.Feature.ALLOW_COMMENTS, true);
     }
 
-    public MealPlan generateMealPlan(UserProfile profile, MacroTargets targets) throws RuntimeException {
-        if (mockMode) {
-            return generateMockMealPlan(profile, targets);
-        }
-        String prompt = buildPromptV2(profile, targets);
-        String raw = callAI(prompt);
-        try {
-            String json = sanitizeToJson(raw);
-            MealPlan plan = parseAIResponse(json, targets);
-            fillMissingDailyTotals(plan, targets);
-            return plan;
-        } catch (RuntimeException ex) {
-            if (!repairEnabled) throw ex;
-            String repaired = repairJsonWithAI(raw, targets);
-            String sanitized = sanitizeToJson(repaired);
-            MealPlan plan = parseAIResponse(sanitized, targets);
-            fillMissingDailyTotals(plan, targets);
-            return plan;
-        }
+    public MealPlan generateMealPlan(User user, UserProfile profile, MacroTargets targets) throws RuntimeException {
+        return generateMealPlan(user, profile, targets, null);
     }
 
-    public MealPlan generateMealPlan(UserProfile profile, MacroTargets targets, String extraPrompt) throws RuntimeException {
+    /** @param user who the plan is for; AI usage and cost are recorded against them */
+    public MealPlan generateMealPlan(User user, UserProfile profile, MacroTargets targets, String extraPrompt) throws RuntimeException {
         if (mockMode) {
             return generateMockMealPlan(profile, targets);
         }
         String base = buildPromptV2(profile, targets);
         String prompt = (extraPrompt != null && !extraPrompt.isBlank()) ? (base + "\n\n" + extraPrompt) : base;
-        String raw = callAI(prompt);
+        String raw = aiClient.complete(user, AiClient.Kind.PLAN, prompt);
         try {
             String json = sanitizeToJson(raw);
             MealPlan plan = parseAIResponse(json, targets);
@@ -102,7 +53,7 @@ public class MealPlanService {
             return plan;
         } catch (RuntimeException ex) {
             if (!repairEnabled) throw ex;
-            String repaired = repairJsonWithAI(raw, targets);
+            String repaired = repairJsonWithAI(user, raw, targets);
             String sanitized = sanitizeToJson(repaired);
             MealPlan plan = parseAIResponse(sanitized, targets);
             fillMissingDailyTotals(plan, targets);
@@ -160,144 +111,12 @@ public class MealPlanService {
         return new GroceryList(lists);
     }
 
-    // --- AI Integration ---
-    private String callAI(String prompt) {
-        if (apiKey == null || apiKey.isBlank()) {
-            throw new IllegalStateException("AI API key is not configured. Set ai.api.key or AI_API_KEY env var.");
-        }
-        if ("openai".equalsIgnoreCase(provider)) {
-            return callOpenAI(prompt);
-        }
-        return callAnthropic(prompt);
-    }
-
-    private String callAnthropic(String prompt) {
-        List<String> candidates = new ArrayList<>();
-        if (anthropicModel != null && !anthropicModel.isBlank()) {
-            candidates.add(anthropicModel);
-        }
-        // Fallbacks (broadly available)
-        candidates.add("claude-3-5-haiku-20241022");
-        candidates.add("claude-3-haiku-20240307");
-
-        RuntimeException last = null;
-        Set<String> tried = new LinkedHashSet<>();
-        for (String model : candidates) {
-            if (!tried.add(model)) continue;
-            try {
-                return callAnthropicWithModel(prompt, model);
-            } catch (RuntimeException e) {
-                last = e;
-                String msg = e.getMessage() == null ? "" : e.getMessage().toLowerCase(Locale.ROOT);
-                if (msg.contains("404") || msg.contains("not_found_error")) {
-                    // try next model
-                    continue;
-                }
-                // for other errors, fail fast
-                throw e;
-            }
-        }
-        if (last != null) throw last;
-        throw new RuntimeException("Anthropic call failed: no models attempted");
-    }
-
-    private String callAnthropicWithModel(String prompt, String model) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", model);
-        body.put("max_tokens", maxTokens);
-        body.put("temperature", temperature);
-        List<Map<String, Object>> messages = new ArrayList<>();
-        Map<String, Object> userMsg = new LinkedHashMap<>();
-        userMsg.put("role", "user");
-        // Use simple string content to minimize schema mismatch issues
-        userMsg.put("content", prompt);
-        messages.add(userMsg);
-        body.put("messages", messages);
-
-        return webClient.post()
-                .uri(anthropicUrl)
-                .header("x-api-key", apiKey)
-                .header("anthropic-version", "2023-06-01")
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .exchangeToMono(resp -> {
-                    if (resp.statusCode().isError()) {
-                        return resp.bodyToMono(String.class).defaultIfEmpty("").flatMap(errBody ->
-                                Mono.error(new RuntimeException("Failed to call Anthropic: " + resp.statusCode() + (errBody.isBlank() ? "" : (" - " + errBody)) )));
-                    }
-                    return resp.bodyToMono(String.class);
-                })
-                .timeout(timeout)
-                .map(this::extractAnthropicText)
-                .block();
-    }
-
-    private String callOpenAI(String prompt) {
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("model", openaiModel);
-        List<Map<String, String>> messages = new ArrayList<>();
-        messages.add(Map.of("role", "user", "content", prompt));
-        body.put("messages", messages);
-        body.put("temperature", temperature);
-        body.put("max_tokens", maxTokens);
-
-        return webClient.post()
-                .uri(openaiUrl)
-                .header(HttpHeaders.AUTHORIZATION, "Bearer " + apiKey)
-                .contentType(MediaType.APPLICATION_JSON)
-                .bodyValue(body)
-                .exchangeToMono(resp -> {
-                    if (resp.statusCode().isError()) {
-                        return resp.bodyToMono(String.class).defaultIfEmpty("").flatMap(errBody ->
-                                Mono.error(new RuntimeException("Failed to call OpenAI: " + resp.statusCode() + (errBody.isBlank() ? "" : (" - " + errBody)) )));
-                    }
-                    return resp.bodyToMono(String.class);
-                })
-                .timeout(timeout)
-                .map(this::extractOpenAIText)
-                .block();
-    }
-
-    private String extractAnthropicText(String raw) {
-        try {
-            AnthropicResponse r = mapper.readValue(raw, AnthropicResponse.class);
-            if (r.content != null && !r.content.isEmpty()) {
-                StringBuilder sb = new StringBuilder();
-                for (AnthropicContent c : r.content) {
-                    if ("text".equalsIgnoreCase(c.type) && c.text != null) sb.append(c.text);
-                }
-                return sb.toString();
-            }
-        } catch (Exception ignored) {}
-        return raw;
-    }
-
-    private String extractOpenAIText(String raw) {
-        try {
-            OpenAIResponse r = mapper.readValue(raw, OpenAIResponse.class);
-            if (r.choices != null && !r.choices.isEmpty() && r.choices.get(0).message != null) {
-                return Optional.ofNullable(r.choices.get(0).message.content).orElse(raw);
-            }
-        } catch (Exception ignored) {}
-        return raw;
-    }
-
-    // Public minimal wrapper to request a free-form text completion style response
-    // using the configured provider/models. Returns the raw text content from the model.
-    public String completeText(String prompt) {
-        try {
-            return callAI(prompt);
-        } catch (RuntimeException e) {
-            throw e;
-        }
-    }
-
-    private String repairJsonWithAI(String badOutput, MacroTargets targets) {
+    private String repairJsonWithAI(User user, String badOutput, MacroTargets targets) {
         String schema = "Return a VALID JSON object with this structure: {\\n  \"days\": [ { \"day\": number, \"meals\": [ { \"name\": string, \"foods\": [ {\"item\": string, \"portion\": string} ], \"macros\": { \"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number }, \"recipe\": { \"name\": string, \"ingredients\": [string], \"instructions\": [string], \"prepTime\": string, \"cookTime\": string, \"totalTime\": string } } ], \"dailyTotals\": { \"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number } } ] }";
         String repairPrompt = "You returned content that was not valid JSON for the required schema.\n" +
                 "Fix it now by outputting ONLY a valid JSON object matching the schema. No prose. No code fences.\n\n" +
                 schema + "\n\nHere is the content to fix:\n" + badOutput;
-        String response = callAI(repairPrompt);
+        String response = aiClient.complete(user, AiClient.Kind.PLAN_REPAIR, repairPrompt);
         return response;
     }
 
@@ -375,7 +194,7 @@ public class MealPlanService {
     }
 
     // --- Single-meal generation for Swap ---
-    public Meal generateReplacementMeal(MacroTargets target, String avoidSimilarTo) {
+    public Meal generateReplacementMeal(User user, MacroTargets target, String avoidSimilarTo) {
         String avoid = (avoidSimilarTo == null || avoidSimilarTo.isBlank()) ? "" : ("Avoid making anything similar to: " + avoidSimilarTo + "\n");
         String prompt = String.format("""
                 You are a professional fitness nutritionist and chef. Generate ONE different meal that fits these macros closely.
@@ -400,7 +219,7 @@ public class MealPlanService {
                 """,
                 target.getCalories(), target.getProtein(), target.getCarbs(), target.getFat(), avoid);
 
-        String raw = callAI(prompt);
+        String raw = aiClient.complete(user, AiClient.Kind.SWAP, prompt);
         String json = sanitizeToJson(raw);
         return parseSingleMeal(json);
     }
@@ -456,34 +275,6 @@ public class MealPlanService {
         } catch (Exception e) {
             throw new RuntimeException("Invalid single-meal JSON", e);
         }
-    }
-
-    private String buildPrompt(UserProfile profile, MacroTargets targets) {
-        String allergies = (profile.getAllergies() == null || profile.getAllergies().isEmpty())
-                ? "None" : String.join(", ", profile.getAllergies());
-        return "You are a certified personal trainer creating a meal plan. Generate a 3-day meal plan with the following requirements:\n\n" +
-                "USER PROFILE:\n" +
-                "- Daily Calorie Target: " + targets.getCalories() + "\n" +
-                "- Daily Protein Target: " + targets.getProtein() + "g\n" +
-                "- Daily Carb Target: " + targets.getCarbs() + "g\n" +
-                "- Daily Fat Target: " + targets.getFat() + "g\n" +
-                "- Fitness Goal: " + profile.getFitnessGoal() + "\n" +
-                "- Allergies/Restrictions: " + allergies + "\n\n" +
-                "RULES:\n" +
-                "1. Each day should have 3-4 meals + 1 snack\n" +
-                "2. Favor the user's preferred foods when available; convenience and restaurant items are acceptable if they fit macros\n" +
-                "3. Preferred foods: beef, chicken, fish, eggs, Greek yogurt, fruits, vegetables, rice, sweet potatoes, quinoa, real milk\n" +
-                "4. Do not exclude processed or packaged foods by default; avoid only items in allergies/restrictions\n" +
-                "5. Each day's macros should hit the targets (±50 calories acceptable)\n" +
-                "6. Exclude any foods the user is allergic to\n\n" +
-                "RECIPE GUIDELINES (for each meal include a SIMPLE recipe):\n" +
-                "- Use basic methods only (boil, bake, pan-fry, microwave)\n" +
-                "- Keep instructions practical; 5-7 steps max\n" +
-                "- Common ingredients; no obscure items\n" +
-                "- Flexible phrasing (e.g., 'cook chicken how you like')\n\n" +
-                "OUTPUT FORMAT (JSON):\n" +
-                "{\n  \"days\": [\n    {\n      \"day\": 1,\n      \"meals\": [\n        {\n          \"name\": \"Breakfast\",\n          \"foods\": [\n            {\"item\": \"Scrambled eggs\", \"portion\": \"3 large eggs\"},\n            {\"item\": \"Oatmeal\", \"portion\": \"1 cup cooked\"}\n          ],\n          \"macros\": {\n            \"calories\": 450,\n            \"protein\": 30,\n            \"carbs\": 45,\n            \"fat\": 15\n          },\n          \"recipe\": {\n            \"name\": \"Scrambled Eggs with Oatmeal\",\n            \"ingredients\": [\"3 large eggs\", \"1 cup cooked oatmeal\", \"1 tsp butter or oil\", \"Salt and pepper\"],\n            \"instructions\": [\"Heat a small pan over medium heat\", \"Scramble the eggs until set\", \"Season to taste\", \"Serve with oatmeal\"],\n            \"prepTime\": \"5 mins\",\n            \"cookTime\": \"10 mins\",\n            \"totalTime\": \"15 mins\"\n          }\n        }\n      ],\n      \"dailyTotals\": {\n        \"calories\": " + targets.getCalories() + ",\n        \"protein\": " + targets.getProtein() + ",\n        \"carbs\": " + targets.getCarbs() + ",\n        \"fat\": " + targets.getFat() + "\n      }\n    }\n  ]\n}\n\nGenerate the complete 3-day plan now." +
-                "\nIMPORTANT: Return ONLY the JSON object. No code fences, no markdown, no explanation.";
     }
 
     // --- Mock plan generation (for offline dev) ---
@@ -781,15 +572,6 @@ public class MealPlanService {
     private MacroTargets toMacroTargets(MacroTargetsDTO m) {
         if (m == null) return null;
         return new MacroTargets(m.calories, m.protein, m.carbs, m.fat);
-    }
-
-    private String extractJson(String text) {
-        int start = text.indexOf('{');
-        int end = text.lastIndexOf('}');
-        if (start >= 0 && end > start) {
-            return text.substring(start, end + 1);
-        }
-        return text;
     }
 
     private String safe(String s) { return s == null ? "" : s.trim(); }
@@ -1114,30 +896,4 @@ public class MealPlanService {
         public String totalTime;
     }
 
-    // --- API response DTOs ---
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class AnthropicResponse {
-        public List<AnthropicContent> content;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class AnthropicContent {
-        public String type;
-        public String text;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class OpenAIResponse {
-        public List<OpenAIChoice> choices;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class OpenAIChoice {
-        public OpenAIMessage message;
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    private static class OpenAIMessage {
-        public String content;
-    }
 }

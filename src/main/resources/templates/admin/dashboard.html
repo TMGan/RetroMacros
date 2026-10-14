@@ -1,82 +1,89 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard | Retro Macros</title>
-    <link rel="stylesheet" th:href="@{/css/admin.css}">
-    <link rel="stylesheet" th:href="@{/css/theme.css}">
-    </head>
-<body class="admin">
-<div th:if="${session.impersonating}" class="impersonation-banner">
-    You are impersonating a user.
-    <a href="/admin/exit-impersonation">Exit Impersonation</a>
+    <th:block th:replace="~{fragments/admin :: adminHead('Overview')}"></th:block>
+</head>
+<body class="neon">
+<th:block th:replace="~{fragments/admin :: navbar('dashboard')}"></th:block>
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="section-title mb-0">Overview</h2>
+        <div class="d-flex flex-wrap gap-2">
+            <a href="/admin/invites" class="btn btn-neon"><i class="bi bi-envelope-plus"></i> Invite a client</a>
+            <a href="/admin/export/users" class="btn btn-outline-neon"><i class="bi bi-download"></i> Export clients</a>
+        </div>
     </div>
-<div class="admin-header">
-    <h1>⚡ RETRO MACROS ADMIN</h1>
-    <nav class="admin-nav">
-        <a href="/admin" class="active">Dashboard</a>
-        <a href="/admin/users">Users</a>
-        <a href="/admin/invites">Invites</a>
-        <a href="/admin/meal-plans">Meal Plans</a>
-        <a href="/admin/food-logs">Food Logs</a>
-        <a href="/admin/ai-accuracy">AI Accuracy</a>
-        <a href="/dashboard">← Exit Admin</a>
-    </nav>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Clients</div>
+                <div class="stat-value" th:text="${totalUsers}">0</div>
+                <div class="stat-sub" th:text="${newUsersThisWeek} + ' new this week'">0 new this week</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Logged today</div>
+                <div class="stat-value" th:text="${activeToday}">0</div>
+                <div class="stat-sub">clients with a food entry</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Plans this week</div>
+                <div class="stat-value" th:text="${mealPlansThisWeek}">0</div>
+                <div class="stat-sub" th:text="${totalFoodLogs} + ' food logs total'">0 food logs total</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">AI cost this month</div>
+                <div class="stat-value" th:text="'$' + ${aiCostThisMonth}">$0</div>
+                <div class="stat-sub" th:text="'$' + ${aiCostAllTime} + ' all time'">$0 all time</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">AI success rate</div>
+                <div class="stat-value" th:text="${aiSuccessRate} + '%'">0%</div>
+                <div class="stat-sub">of saved meal plans</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-4 col-xl-2">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Macro accuracy</div>
+                <div class="stat-value" th:text="${macroAccuracy} + '%'">0%</div>
+                <div class="stat-sub">plan vs target</div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="card neon">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5 class="mb-0">Recent sign-ups</h5>
+                <a href="/admin/users" class="btn btn-sm btn-outline-neon">All clients</a>
+            </div>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(recentUsers)}">
+                <table class="table table-dark table-hover">
+                    <thead><tr><th>Name</th><th>Email</th><th>Signed up</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="u : ${recentUsers}" th:attr="data-href=@{/admin/users/{id}(id=${u.id})}">
+                        <td th:text="${u.name}">Name</td>
+                        <td th:text="${u.email}">email</td>
+                        <td th:text="${u.createdAt != null ? #temporals.format(u.createdAt, 'MMM d, yyyy') : ''}">date</td>
+                        <td class="text-end"><a th:href="@{/admin/users/{id}(id=${u.id})}" class="btn btn-sm btn-outline-neon">View</a></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div th:if="${#lists.isEmpty(recentUsers)}" class="empty-state">No clients yet. Invite one to get started.</div>
+        </div>
+    </div>
 </div>
 
-<div class="admin-container">
-    <div class="stats-grid">
-        <div class="stat-card">
-            <div class="stat-label">Total Users</div>
-            <div class="stat-value" th:text="${totalUsers}">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">New This Week</div>
-            <div class="stat-value" th:text="${newUsersThisWeek}">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Active Today</div>
-            <div class="stat-value" th:text="${activeToday}">0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">AI Success Rate</div>
-            <div class="stat-value" th:text="${aiSuccessRate} + '%'">0%</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">API Cost</div>
-            <div class="stat-value" th:text="'$' + ${estimatedApiCost}">$0</div>
-        </div>
-        <div class="stat-card">
-            <div class="stat-label">Macro Accuracy</div>
-            <div class="stat-value" th:text="${macroAccuracy} + '%'">0%</div>
-        </div>
-    </div>
-
-    <div class="admin-table-container">
-        <h2 style="margin-top:0">Recent Sign-Ups</h2>
-        <table class="admin-table">
-            <thead><tr><th>Name</th><th>Email</th><th>Signed Up</th><th>Actions</th></tr></thead>
-            <tbody>
-            <tr th:each="user : ${recentUsers}" onclick="window.location.href='/admin/users/' + [[${user.id}]]">
-                <td th:text="${user.name}">User</td>
-                <td th:text="${user.email}">user@email</td>
-                <td th:text="${user.createdAt}">date</td>
-                <td><a th:href="@{/admin/users/{id}(id=${user.id})}" class="btn-admin" onclick="event.stopPropagation()">View</a></td>
-            </tr>
-            </tbody>
-        </table>
-    </div>
-
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <a href="/admin/users" class="btn-admin">View All Users</a>
-        <a href="/admin/meal-plans" class="btn-admin">View Meal Plans</a>
-        <a href="/admin/food-logs" class="btn-admin">View Food Logs</a>
-        <a href="/admin/ai-accuracy" class="btn-admin">Check AI Accuracy</a>
-        <a href="/admin/export/users" class="btn-admin btn-success">Export Users</a>
-    </div>
-</div>
-
+<th:block th:replace="~{fragments/admin :: scripts}"></th:block>
 </body>
 </html>
-

@@ -45,10 +45,11 @@
       <optional>true</optional>
     </dependency>
 
-    <!-- WebClient (reactive HTTP client) without enabling reactive server -->
+    <!-- Official Anthropic SDK for the Claude API -->
     <dependency>
-      <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-webflux</artifactId>
+      <groupId>com.anthropic</groupId>
+      <artifactId>anthropic-java</artifactId>
+      <version>2.34.0</version>
     </dependency>
 
     <!-- Bootstrap 5 via WebJars -->

@@ -143,6 +143,29 @@ class SecurityHardeningTest {
 
         mvc.perform(get("/admin").with(signedInAs(coach))).andExpect(status().isOk());
         mvc.perform(get("/admin/invites").with(signedInAs(coach))).andExpect(status().isOk());
+        mvc.perform(get("/admin/users/" + client.getId()).with(signedInAs(coach)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("AI cost this month")));
+    }
+
+    @Test
+    void everyAdminPageRendersWithData() throws Exception {
+        User coach = newUser(true);
+        User client = newUser(false);
+        newLog(client);
+        mvc.perform(generatePlan().with(signedInAs(client)).with(csrf())).andExpect(status().isOk());
+        allowedEmailRepository.save(new AllowedEmail(UUID.randomUUID() + "@example.com", "test invite"));
+        long planId = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0).getId();
+
+        for (String page : new String[] {
+                "/admin", "/admin/users", "/admin/users?search=Test&sortBy=name", "/admin/users/" + client.getId(),
+                "/admin/invites", "/admin/meal-plans", "/admin/meal-plans?userId=" + client.getId(),
+                "/admin/meal-plans/" + planId, "/admin/food-logs", "/admin/food-logs?userId=" + client.getId(),
+                "/admin/ai-accuracy"}) {
+            mvc.perform(get(page).with(signedInAs(coach)))
+                    .andExpect(status().isOk())
+                    .andExpect(content().string(containsString("theme.css")));
+        }
     }
 
     @Test

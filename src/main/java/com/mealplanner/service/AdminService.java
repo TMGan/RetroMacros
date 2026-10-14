@@ -23,6 +23,7 @@ public class AdminService {
     private final com.mealplanner.repository.LearnedUserPreferenceRepository learnedUserPreferenceRepository;
     private final com.mealplanner.repository.UserFoodPreferencesRepository userFoodPreferencesRepository;
     private final com.mealplanner.repository.AiUsageRepository aiUsageRepository;
+    private final com.mealplanner.repository.AiCallLogRepository aiCallLogRepository;
 
     public AdminService(UserRepository userRepository,
                         SavedMealPlanRepository savedMealPlanRepository,
@@ -30,7 +31,9 @@ public class AdminService {
                         com.mealplanner.repository.SwapHistoryRepository swapHistoryRepository,
                         com.mealplanner.repository.LearnedUserPreferenceRepository learnedUserPreferenceRepository,
                         com.mealplanner.repository.UserFoodPreferencesRepository userFoodPreferencesRepository,
-                        com.mealplanner.repository.AiUsageRepository aiUsageRepository) {
+                        com.mealplanner.repository.AiUsageRepository aiUsageRepository,
+                        com.mealplanner.repository.AiCallLogRepository aiCallLogRepository) {
+        this.aiCallLogRepository = aiCallLogRepository;
         this.swapHistoryRepository = swapHistoryRepository;
         this.learnedUserPreferenceRepository = learnedUserPreferenceRepository;
         this.userFoodPreferencesRepository = userFoodPreferencesRepository;
@@ -57,9 +60,10 @@ public class AdminService {
         double successRate = totalPlans > 0 ? ((totalPlans - failedPlans) * 100.0 / totalPlans) : 0;
         stats.put("aiSuccessRate", Math.round(successRate * 10) / 10.0);
 
-        // Estimate Claude API cost (~$0.075 per plan per your guide)
-        double estimatedCost = totalPlans * 0.075;
-        stats.put("estimatedApiCost", Math.round(estimatedCost * 100) / 100.0);
+        // Real spend, from the token counts recorded on every AI call.
+        LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        stats.put("aiCostThisMonth", dollars(aiCallLogRepository.sumCostMicrosSince(monthStart)));
+        stats.put("aiCostAllTime", dollars(aiCallLogRepository.sumCostMicros()));
 
         Double avgAccuracy = null;
         try { avgAccuracy = savedMealPlanRepository.getAverageAccuracyScore(); } catch (Exception ignore) {}
@@ -132,6 +136,11 @@ public class AdminService {
         long daysActive = allFood.stream().map(FoodLog::getLogDate).distinct().count();
         details.put("daysActive", daysActive);
 
+        LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
+        details.put("aiCostThisMonth", dollars(aiCallLogRepository.sumCostMicrosForUserSince(user, monthStart)));
+        details.put("aiCostAllTime", dollars(aiCallLogRepository.sumCostMicrosForUser(user)));
+        details.put("aiCalls", aiCallLogRepository.countByUser(user));
+
         return details;
     }
 
@@ -156,6 +165,11 @@ public class AdminService {
         return metrics;
     }
 
+    /** Millionths of a dollar to a display string such as "1.84". */
+    private String dollars(long micros) {
+        return String.format(java.util.Locale.US, "%.2f", micros / 1_000_000.0);
+    }
+
     public List<User> searchUsers(String query) {
         return userRepository.findByEmailContainingIgnoreCaseOrNameContainingIgnoreCase(query, query);
     }
@@ -171,6 +185,8 @@ public class AdminService {
         learnedUserPreferenceRepository.deleteAll(learnedUserPreferenceRepository.findByUserOrderByConfidenceScoreDesc(user));
         userFoodPreferencesRepository.findByUser(user).ifPresent(userFoodPreferencesRepository::delete);
         aiUsageRepository.deleteAll(aiUsageRepository.findByUser(user));
+        // Spend history is kept for the books, but no longer points at the person.
+        aiCallLogRepository.detachUser(user);
         // Saved meal plans go with the user (orphanRemoval on User.savedMealPlans).
         userRepository.delete(user);
     }

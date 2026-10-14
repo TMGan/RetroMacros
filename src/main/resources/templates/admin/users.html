@@ -1,58 +1,65 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>All Users | Admin</title>
-    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <th:block th:replace="~{fragments/admin :: adminHead('Clients')}"></th:block>
 </head>
-<body class="admin">
-<div class="admin-header">
-    <h1>⚡ USERS</h1>
-    <nav class="admin-nav">
-        <a href="/admin">Dashboard</a>
-        <a href="/admin/users" class="active">Users</a>
-        <a href="/admin/invites">Invites</a>
-        <a href="/admin/meal-plans">Meal Plans</a>
-        <a href="/admin/food-logs">Food Logs</a>
-        <a href="/admin/ai-accuracy">AI Accuracy</a>
-    </nav>
-</div>
-<div class="admin-container">
-    <div class="search-bar">
-        <form action="/admin/users" method="get">
-            <input type="text" name="search" th:value="${search}" placeholder="Search by name or email..." autocomplete="off">
-        </form>
+<body class="neon">
+<th:block th:replace="~{fragments/admin :: navbar('users')}"></th:block>
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="section-title mb-0">Clients</h2>
+        <a href="/admin/export/users" class="btn btn-outline-neon"><i class="bi bi-download"></i> Export</a>
     </div>
-    <div class="admin-table-container">
-        <table class="admin-table">
-            <thead>
-                <tr>
-                    <th>ID</th><th>Name</th><th>Email</th><th>Signed Up</th><th>Last Active</th><th>Food Logs</th><th>Meal Plans</th><th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-            <tr th:each="userStat : ${users}" th:with="user=${userStat.user}"
-                onclick="window.location.href='/admin/users/' + [[${user.id}]]" style="cursor:pointer;">
-                <td th:text="${user.id}">1</td>
-                <td th:text="${user.name}">Tim</td>
-                <td th:text="${user.email}">tim@example.com</td>
-                <td th:text="${user.createdAt}">date</td>
-                <td>
-                    <span th:if="${userStat.lastActive != null}" th:text="${userStat.lastActive}">date</span>
-                    <span th:unless="${userStat.lastActive != null}" class="badge badge-warning">Never</span>
-                </td>
-                <td th:text="${userStat.totalFoodLogs}">0</td>
-                <td th:text="${userStat.totalMealPlans}">0</td>
-                <td onclick="event.stopPropagation()">
-                    <a th:href="@{/admin/users/{id}(id=${user.id})}" class="btn-admin">View</a>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        <div th:if="${#lists.isEmpty(users)}" style="text-align:center; padding: 30px; opacity:.6;">No users found.</div>
+
+    <div th:if="${param.deleted}" class="alert alert-success">Client and all of their data deleted.</div>
+
+    <form action="/admin/users" method="get" class="row g-2 mb-3">
+        <div class="col-12 col-md-6">
+            <input type="text" name="search" th:value="${search}" class="form-control" placeholder="Search by name or email" autocomplete="off">
+        </div>
+        <div class="col-8 col-md-3">
+            <select name="sortBy" class="form-select" onchange="this.form.submit()">
+                <option value="" th:selected="${sortBy == null}">Sort: default</option>
+                <option value="name" th:selected="${sortBy == 'name'}">Name</option>
+                <option value="created" th:selected="${sortBy == 'created'}">Newest</option>
+                <option value="active" th:selected="${sortBy == 'active'}">Last active</option>
+            </select>
+        </div>
+        <div class="col-4 col-md-3 d-grid">
+            <button type="submit" class="btn btn-neon"><i class="bi bi-search"></i> Search</button>
+        </div>
+    </form>
+
+    <div class="card neon">
+        <div class="card-body">
+            <div class="table-responsive" th:if="${!#lists.isEmpty(users)}">
+                <table class="table table-dark table-hover">
+                    <thead><tr><th>Name</th><th>Email</th><th>Signed up</th><th>Last logged food</th><th>Food logs</th><th>Plans</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="userStat : ${users}" th:with="u=${userStat.user}" th:attr="data-href=@{/admin/users/{id}(id=${u.id})}">
+                        <td>
+                            <span th:text="${u.name}">Name</span>
+                            <span th:if="${u.admin}" class="badge text-bg-info ms-1">Admin</span>
+                        </td>
+                        <td th:text="${u.email}">email</td>
+                        <td th:text="${u.createdAt != null ? #temporals.format(u.createdAt, 'MMM d, yyyy') : ''}">date</td>
+                        <td>
+                            <span th:if="${userStat.lastActive != null}" th:text="${#temporals.format(userStat.lastActive, 'MMM d, yyyy')}">date</span>
+                            <span th:unless="${userStat.lastActive != null}" class="badge text-bg-warning">Never</span>
+                        </td>
+                        <td th:text="${userStat.totalFoodLogs}">0</td>
+                        <td th:text="${userStat.totalMealPlans}">0</td>
+                        <td class="text-end"><a th:href="@{/admin/users/{id}(id=${u.id})}" class="btn btn-sm btn-outline-neon">View</a></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div th:if="${#lists.isEmpty(users)}" class="empty-state">No clients found.</div>
+        </div>
     </div>
 </div>
+
+<th:block th:replace="~{fragments/admin :: scripts}"></th:block>
 </body>
 </html>
-

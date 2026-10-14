@@ -61,7 +61,7 @@ public class MealApiController {
                     req.targetCarbs,
                     req.targetFat
             );
-            Meal replacement = mealPlanService.generateReplacementMeal(target, cleanHint(req.avoidSimilarTo));
+            Meal replacement = mealPlanService.generateReplacementMeal(user, target, cleanHint(req.avoidSimilarTo));
             if (replacement == null) {
                 return ResponseEntity.status(502).body(Map.of("error", "Could not generate replacement meal"));
             }

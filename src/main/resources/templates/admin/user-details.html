@@ -1,81 +1,110 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title th:text="${user.name} + ' | Admin'">User Details</title>
-    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <th:block th:replace="~{fragments/admin :: adminHead(${user.name})}"></th:block>
 </head>
-<body class="admin">
-<div class="admin-header">
-    <h1 th:text="'👤 ' + ${user.name}">User</h1>
-    <nav class="admin-nav">
-        <a href="/admin">Dashboard</a>
-        <a href="/admin/users" class="active">Users</a>
-        <a href="/admin/invites">Invites</a>
-        <a href="/admin/meal-plans">Meal Plans</a>
-        <a href="/admin/food-logs">Food Logs</a>
-    </nav>
+<body class="neon">
+<th:block th:replace="~{fragments/admin :: navbar('users')}"></th:block>
+
+<div class="container py-4">
+    <a href="/admin/users" class="text-muted text-decoration-none small"><i class="bi bi-arrow-left"></i> All clients</a>
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-3 mt-2 mb-4">
+        <div>
+            <h2 class="section-title mb-1" th:text="${user.name}">Client</h2>
+            <div class="text-muted">
+                <span th:text="${user.email}">email</span>
+                <span th:if="${user.createdAt != null}" th:text="' · Joined ' + ${#temporals.format(user.createdAt, 'MMM d, yyyy')}"></span>
+                <span th:if="${lastActive != null}" th:text="' · Last logged food ' + ${#temporals.format(lastActive, 'MMM d, yyyy')}"></span>
+            </div>
+        </div>
+        <div class="d-flex flex-wrap gap-2">
+            <form th:action="@{/admin/users/{id}/impersonate(id=${user.id})}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-neon"><i class="bi bi-eye"></i> View as client</button>
+            </form>
+            <form th:action="@{/admin/users/{id}/delete(id=${user.id})}" method="post" class="d-inline">
+                <button type="submit" class="btn btn-danger" data-confirm="Click again to delete this client and all their data"><i class="bi bi-trash"></i> Delete</button>
+            </form>
+        </div>
+    </div>
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Days logged</div>
+                <div class="stat-value" th:text="${daysActive}">0</div>
+                <div class="stat-sub" th:text="${totalFoodLogs} + ' entries'">0 entries</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Meal plans</div>
+                <div class="stat-value" th:text="${totalMealPlans}">0</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">Plan accuracy</div>
+                <div class="stat-value" th:text="${avgAccuracy} + '%'">0%</div>
+            </div></div>
+        </div>
+        <div class="col-6 col-lg-3">
+            <div class="card neon h-100"><div class="card-body stat-tile">
+                <div class="stat-label">AI cost this month</div>
+                <div class="stat-value" th:text="'$' + ${aiCostThisMonth}">$0</div>
+                <div class="stat-sub" th:text="'$' + ${aiCostAllTime} + ' all time, ' + ${aiCalls} + ' calls'">all time</div>
+            </div></div>
+        </div>
+    </div>
+
+    <div class="card neon mb-4">
+        <div class="card-body">
+            <h5 class="mb-3">Meal plans</h5>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(mealPlans)}">
+                <table class="table table-dark table-hover">
+                    <thead><tr><th>Created</th><th>Calories</th><th>Protein / Carbs / Fat</th><th>Accuracy</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="plan : ${mealPlans}" th:attr="data-href=@{/admin/meal-plans/{id}(id=${plan.id})}">
+                        <td th:text="${plan.createdAt != null ? #temporals.format(plan.createdAt, 'MMM d, yyyy h:mm a') : ''}">date</td>
+                        <td th:text="${plan.targetCalories}">0</td>
+                        <td th:text="${plan.targetProtein} + 'g / ' + ${plan.targetCarbs} + 'g / ' + ${plan.targetFat} + 'g'">0/0/0</td>
+                        <td>
+                            <span th:if="${plan.accuracyScore != null && plan.accuracyScore >= 90}" class="badge text-bg-primary" th:text="${plan.accuracyScore} + '%'">95%</span>
+                            <span th:if="${plan.accuracyScore != null && plan.accuracyScore < 90}" class="badge bg-danger" th:text="${plan.accuracyScore} + '%'">85%</span>
+                            <span th:unless="${plan.accuracyScore != null}" class="text-muted">Not scored</span>
+                        </td>
+                        <td class="text-end"><a th:href="@{/admin/meal-plans/{id}(id=${plan.id})}" class="btn btn-sm btn-outline-neon">View</a></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div th:if="${#lists.isEmpty(mealPlans)}" class="empty-state">No meal plans yet.</div>
+        </div>
+    </div>
+
+    <div class="card neon">
+        <div class="card-body">
+            <h5 class="mb-3">Food log</h5>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(allFoodLogs)}">
+                <table class="table table-dark table-hover">
+                    <thead><tr><th>Date</th><th>Meal</th><th>Food</th><th>Cal</th><th>P</th><th>C</th><th>F</th></tr></thead>
+                    <tbody>
+                    <tr th:each="entry : ${allFoodLogs}">
+                        <td class="text-nowrap" th:text="${#temporals.format(entry.logDate, 'MMM d')}">date</td>
+                        <td th:text="${entry.mealName}">Lunch</td>
+                        <td th:text="${entry.foodDescription}">food</td>
+                        <td th:text="${entry.calories}">0</td>
+                        <td th:text="${entry.protein}">0</td>
+                        <td th:text="${entry.carbs}">0</td>
+                        <td th:text="${entry.fat}">0</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div th:if="${#lists.isEmpty(allFoodLogs)}" class="empty-state">No food logged yet.</div>
+        </div>
+    </div>
 </div>
-<div class="admin-container">
-    <div class="stats-grid">
-        <div class="stat-card"><div class="stat-label">Total Food Logs</div><div class="stat-value" th:text="${totalFoodLogs}">0</div></div>
-        <div class="stat-card"><div class="stat-label">Total Meal Plans</div><div class="stat-value" th:text="${totalMealPlans}">0</div></div>
-        <div class="stat-card"><div class="stat-label">Days Active</div><div class="stat-value" th:text="${daysActive}">0</div></div>
-        <div class="stat-card"><div class="stat-label">Avg Macro Accuracy</div><div class="stat-value" th:text="${avgAccuracy} + '%'">0%</div></div>
-    </div>
 
-    <div class="admin-table-container">
-        <h2 style="margin-top:0">Meal Plans</h2>
-        <table class="admin-table" th:if="${!#lists.isEmpty(mealPlans)}">
-            <thead><tr><th>Created</th><th>Target Cal</th><th>Macros (P/C/F)</th><th>Accuracy</th><th>Actions</th></tr></thead>
-            <tbody>
-            <tr th:each="plan : ${mealPlans}">
-                <td th:text="${plan.createdAt}">date</td>
-                <td th:text="${plan.targetCalories} + ' cal'">0 cal</td>
-                <td th:text="${plan.targetProtein} + 'g / ' + ${plan.targetCarbs} + 'g / ' + ${plan.targetFat} + 'g'">0/0/0</td>
-                <td>
-                    <span th:if="${plan.accuracyScore != null && plan.accuracyScore >= 90}" class="badge badge-success" th:text="${plan.accuracyScore} + '%'">95%</span>
-                    <span th:if="${plan.accuracyScore != null && plan.accuracyScore < 90}" class="badge badge-danger" th:text="${plan.accuracyScore} + '%'">85%</span>
-                    <span th:unless="${plan.accuracyScore != null}" class="badge badge-warning">N/A</span>
-                </td>
-                <td><a th:href="@{/admin/meal-plans/{id}(id=${plan.id})}" class="btn-admin">View</a></td>
-            </tr>
-            </tbody>
-        </table>
-        <div th:if="${#lists.isEmpty(mealPlans)}" style="opacity:.6">No meal plans generated yet.</div>
-    </div>
-
-    <div class="admin-table-container">
-        <h2 style="margin-top:0">Food Log History</h2>
-        <table class="admin-table" th:if="${!#lists.isEmpty(allFoodLogs)}">
-            <thead><tr><th>Date</th><th>Food</th><th>Calories</th><th>Protein</th><th>Carbs</th><th>Fat</th></tr></thead>
-            <tbody>
-            <tr th:each="entry : ${allFoodLogs}">
-                <td th:text="${entry.logDate}">date</td>
-                <td th:text="${entry.foodDescription}">food</td>
-                <td th:text="${entry.calories}">0</td>
-                <td th:text="${entry.protein}">0</td>
-                <td th:text="${entry.carbs}">0</td>
-                <td th:text="${entry.fat}">0</td>
-            </tr>
-            </tbody>
-        </table>
-        <div th:if="${#lists.isEmpty(allFoodLogs)}" style="opacity:.6">No food logged yet.</div>
-    </div>
-
-    <div style="display:flex; gap:10px; flex-wrap:wrap;">
-        <form th:action="@{/admin/users/{id}/impersonate(id=${user.id})}" method="post" style="display:inline;">
-            <button type="submit" class="btn-admin btn-success">🔀 Impersonate User</button>
-        </form>
-        <a th:href="@{/admin/meal-plans(userId=${user.id})}" class="btn-admin">View Their Meal Plans</a>
-        <a th:href="@{/admin/food-logs(userId=${user.id})}" class="btn-admin">View Their Food Logs</a>
-        <form th:action="@{/admin/users/{id}/delete(id=${user.id})}" method="post" style="display:inline">
-            <button type="submit" class="btn-admin btn-danger" data-confirm="Click again to delete this user and all data">🗑️ Delete User</button>
-        </form>
-    </div>
-</div>
-<script th:src="@{/js/confirm-click.js}"></script>
+<th:block th:replace="~{fragments/admin :: scripts}"></th:block>
 </body>
 </html>
-

@@ -1,58 +1,61 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Invites | Admin</title>
-    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <th:block th:replace="~{fragments/admin :: adminHead('Invites')}"></th:block>
 </head>
-<body class="admin">
-<div class="admin-header">
-    <h1>⚡ INVITES</h1>
-    <nav class="admin-nav">
-        <a href="/admin">Dashboard</a>
-        <a href="/admin/users">Users</a>
-        <a href="/admin/invites" class="active">Invites</a>
-        <a href="/admin/meal-plans">Meal Plans</a>
-        <a href="/admin/food-logs">Food Logs</a>
-        <a href="/admin/ai-accuracy">AI Accuracy</a>
-    </nav>
-</div>
-<div class="admin-container">
-    <p th:if="${param.invalid}" class="badge badge-danger">That does not look like an email address.</p>
-    <p th:if="${param.added}" class="badge badge-success">Invite saved.</p>
-    <p th:if="${param.removed}" class="badge badge-warning">Invite removed.</p>
+<body class="neon">
+<th:block th:replace="~{fragments/admin :: navbar('invites')}"></th:block>
 
-    <div class="search-bar">
-        <form th:action="@{/admin/invites}" method="post">
-            <input type="email" name="email" placeholder="client@gmail.com" maxlength="254" required autocomplete="off">
-            <input type="text" name="note" placeholder="Note (optional)" maxlength="200" autocomplete="off">
-            <button type="submit" class="btn-admin btn-success">Invite</button>
-        </form>
-    </div>
-    <p style="opacity:.7; font-size:13px;">Only these Google accounts can sign in. Removing one blocks the next sign-in; it does not delete the client's data.</p>
+<div class="container py-4">
+    <h2 class="section-title mb-1">Invites</h2>
+    <p class="text-muted mb-4">Only these Google accounts can sign in. Removing one blocks their next sign-in; it does not delete their data.</p>
 
-    <div class="admin-table-container">
-        <table class="admin-table">
-            <thead>
-                <tr><th>Email</th><th>Note</th><th>Invited</th><th>Actions</th></tr>
-            </thead>
-            <tbody>
-            <tr th:each="invite : ${invites}">
-                <td th:text="${invite.email}">client@example.com</td>
-                <td th:text="${invite.note}">note</td>
-                <td th:text="${#temporals.format(invite.invitedAt, 'yyyy-MM-dd')}">date</td>
-                <td>
-                    <form th:action="@{/admin/invites/{id}/delete(id=${invite.id})}" method="post" style="display:inline">
-                        <button type="submit" class="btn-admin btn-danger" data-confirm="Click again to remove">Remove</button>
-                    </form>
-                </td>
-            </tr>
-            </tbody>
-        </table>
-        <div th:if="${#lists.isEmpty(invites)}" style="text-align:center; padding: 30px; opacity:.6;">No invites yet.</div>
+    <div th:if="${param.invalid}" class="alert alert-danger">That does not look like an email address.</div>
+    <div th:if="${param.added}" class="alert alert-success">Invite saved. They can sign in with that Google account now.</div>
+    <div th:if="${param.removed}" class="alert alert-warning">Invite removed.</div>
+
+    <div class="card neon mb-4">
+        <div class="card-body">
+            <h5 class="mb-3">Invite a client</h5>
+            <form th:action="@{/admin/invites}" method="post" class="row g-2">
+                <div class="col-12 col-md-5">
+                    <input type="email" name="email" class="form-control" placeholder="Their Google email" maxlength="254" required autocomplete="off">
+                </div>
+                <div class="col-12 col-md-5">
+                    <input type="text" name="note" class="form-control" placeholder="Note, for example their name (optional)" maxlength="200" autocomplete="off">
+                </div>
+                <div class="col-12 col-md-2 d-grid">
+                    <button type="submit" class="btn btn-neon"><i class="bi bi-plus-lg"></i> Invite</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div class="card neon">
+        <div class="card-body">
+            <h5 class="mb-3">Invited <span class="text-muted fs-6" th:text="'(' + ${#lists.size(invites)} + ')'">(0)</span></h5>
+            <div class="table-responsive" th:if="${!#lists.isEmpty(invites)}">
+                <table class="table table-dark table-hover">
+                    <thead><tr><th>Email</th><th>Note</th><th>Invited</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="invite : ${invites}">
+                        <td th:text="${invite.email}">client@example.com</td>
+                        <td th:text="${invite.note}">note</td>
+                        <td th:text="${invite.invitedAt != null ? #temporals.format(invite.invitedAt, 'MMM d, yyyy') : ''}">date</td>
+                        <td class="text-end">
+                            <form th:action="@{/admin/invites/{id}/delete(id=${invite.id})}" method="post" class="d-inline">
+                                <button type="submit" class="btn btn-sm btn-danger" data-confirm="Click again to remove">Remove</button>
+                            </form>
+                        </td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div th:if="${#lists.isEmpty(invites)}" class="empty-state">No invites yet.</div>
+        </div>
     </div>
 </div>
-<script th:src="@{/js/confirm-click.js}"></script>
+
+<th:block th:replace="~{fragments/admin :: scripts}"></th:block>
 </body>
 </html>

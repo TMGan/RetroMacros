@@ -1,44 +1,46 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org">
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meal Plans | Admin</title>
-    <link rel="stylesheet" th:href="@{/css/admin.css}">
+    <th:block th:replace="~{fragments/admin :: adminHead('Meal Plans')}"></th:block>
 </head>
-<body class="admin">
-<div class="admin-header">
-    <h1>⚡ MEAL PLANS</h1>
-    <nav class="admin-nav">
-        <a href="/admin">Dashboard</a>
-        <a href="/admin/users">Users</a>
-        <a href="/admin/invites">Invites</a>
-        <a href="/admin/meal-plans" class="active">Meal Plans</a>
-        <a href="/admin/food-logs">Food Logs</a>
-        <a href="/admin/ai-accuracy">AI Accuracy</a>
-    </nav>
-</div>
-<div class="admin-container">
-    <div th:if="${filterUser != null}" style="margin-bottom:10px;">Filtered by user: <span th:text="${filterUser.email}"></span></div>
-    <div class="admin-table-container">
-        <table class="admin-table">
-            <thead><tr><th>ID</th><th>User</th><th>Created</th><th>Target Cal</th><th>Accuracy</th><th>Actions</th></tr></thead>
-            <tbody>
-            <tr th:each="plan : ${mealPlans}">
-                <td th:text="${plan.id}">1</td>
-                <td th:text="${plan.user.email}">email</td>
-                <td th:text="${plan.createdAt}">date</td>
-                <td th:text="${plan.targetCalories}">0</td>
-                <td>
-                    <span th:if="${plan.accuracyScore != null}" th:text="${plan.accuracyScore} + '%'">0%</span>
-                    <span th:unless="${plan.accuracyScore != null}" class="badge badge-warning">N/A</span>
-                </td>
-                <td><a th:href="@{/admin/meal-plans/{id}(id=${plan.id})}" class="btn-admin">View</a></td>
-            </tr>
-            </tbody>
-        </table>
+<body class="neon">
+<th:block th:replace="~{fragments/admin :: navbar('plans')}"></th:block>
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+        <h2 class="section-title mb-0">Meal plans</h2>
+        <a href="/admin/export/meal-plans" class="btn btn-outline-neon"><i class="bi bi-download"></i> Export</a>
+    </div>
+
+    <div th:if="${filterUser != null}" class="alert alert-info d-flex justify-content-between align-items-center">
+        <span>Showing plans for <strong th:text="${filterUser.email}">client</strong></span>
+        <a href="/admin/meal-plans" class="btn btn-sm btn-outline-neon">Show all</a>
+    </div>
+
+    <div class="card neon">
+        <div class="card-body">
+            <div class="table-responsive" th:if="${!#lists.isEmpty(mealPlans)}">
+                <table class="table table-dark table-hover">
+                    <thead><tr><th>Client</th><th>Created</th><th>Calories</th><th>Accuracy</th><th></th></tr></thead>
+                    <tbody>
+                    <tr th:each="plan : ${mealPlans}" th:attr="data-href=@{/admin/meal-plans/{id}(id=${plan.id})}">
+                        <td th:text="${plan.user.email}">email</td>
+                        <td th:text="${plan.createdAt != null ? #temporals.format(plan.createdAt, 'MMM d, yyyy h:mm a') : ''}">date</td>
+                        <td th:text="${plan.targetCalories}">0</td>
+                        <td>
+                            <span th:if="${plan.accuracyScore != null}" th:text="${plan.accuracyScore} + '%'">0%</span>
+                            <span th:unless="${plan.accuracyScore != null}" class="text-muted">Not scored</span>
+                        </td>
+                        <td class="text-end"><a th:href="@{/admin/meal-plans/{id}(id=${plan.id})}" class="btn btn-sm btn-outline-neon">View</a></td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div th:if="${#lists.isEmpty(mealPlans)}" class="empty-state">No meal plans yet.</div>
+        </div>
     </div>
 </div>
+
+<th:block th:replace="~{fragments/admin :: scripts}"></th:block>
 </body>
 </html>
-

@@ -1,6 +1,5 @@
 package com.mealplanner.service;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.mock.env.MockEnvironment;
 
@@ -11,17 +10,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class RandomMealSuggestionTest {
 
-    private final FoodLogService service = new FoodLogService(null, new MockEnvironment().withProperty("ai.mock", "true"));
-
-    /** Wraps model output the way the Messages API returns it. */
-    private String apiResponse(String modelText) throws Exception {
-        return new ObjectMapper().writeValueAsString(Map.of(
-                "content", List.of(Map.of("type", "text", "text", modelText))));
-    }
+    private final FoodLogService service = new FoodLogService(null, new MockEnvironment().withProperty("ai.mock", "true"), null);
 
     @Test
     void offlineSuggestionSaysWhatIsInItAndHowToMakeIt() {
-        Map<String, Object> meal = service.generateRandomHealthyMeal(500, true);
+        Map<String, Object> meal = service.generateRandomHealthyMeal(null, 500, true);
 
         assertThat((String) meal.get("description")).isNotBlank();
         assertThat((List<?>) meal.get("ingredients")).hasSizeGreaterThanOrEqualTo(3);
@@ -36,7 +29,7 @@ class RandomMealSuggestionTest {
                 + " \"steps\": [\"Season and cook the chicken.\", \"Steam the broccoli.\", \"Serve over rice.\"],\n"
                 + " \"calories\": 520, \"protein\": 52, \"carbs\": 52, \"fat\": 9}\n```";
 
-        Map<String, Object> meal = service.parseRandomMealResponse(apiResponse(modelText));
+        Map<String, Object> meal = service.parseRandomMealText(modelText);
 
         assertThat(meal.get("description")).isEqualTo("Chicken \"Power\" Bowl");
         assertThat((List<?>) meal.get("ingredients")).hasSize(4);
@@ -47,10 +40,10 @@ class RandomMealSuggestionTest {
 
     @Test
     void rejectsSuggestionsThatAreNotUsable() throws Exception {
-        assertThat(service.parseRandomMealResponse(apiResponse("Sorry, I can't help with that."))).isNull();
-        assertThat(service.parseRandomMealResponse(apiResponse(
-                "{\"name\": \"Mystery\", \"ingredients\": [], \"steps\": [], \"calories\": 500, \"protein\": 30, \"carbs\": 50, \"fat\": 15}"))).isNull();
-        assertThat(service.parseRandomMealResponse(apiResponse(
-                "{\"name\": \"Huge\", \"ingredients\": [\"1 cow\"], \"steps\": [], \"calories\": 99999, \"protein\": 30, \"carbs\": 50, \"fat\": 15}"))).isNull();
+        assertThat(service.parseRandomMealText("Sorry, I can't help with that.")).isNull();
+        assertThat(service.parseRandomMealText(
+                "{\"name\": \"Mystery\", \"ingredients\": [], \"steps\": [], \"calories\": 500, \"protein\": 30, \"carbs\": 50, \"fat\": 15}")).isNull();
+        assertThat(service.parseRandomMealText(
+                "{\"name\": \"Huge\", \"ingredients\": [\"1 cow\"], \"steps\": [], \"calories\": 99999, \"protein\": 30, \"carbs\": 50, \"fat\": 15}")).isNull();
     }
 }
