@@ -49,11 +49,6 @@ public class ProgressService {
         entry.setCheckInDate(date);
         entry.setWeightLbs(values.getWeightLbs());
         entry.setBodyFatPct(values.getBodyFatPct());
-        entry.setWaistIn(values.getWaistIn());
-        entry.setHipsIn(values.getHipsIn());
-        entry.setChestIn(values.getChestIn());
-        entry.setArmIn(values.getArmIn());
-        entry.setThighIn(values.getThighIn());
         entry.setEnergy(values.getEnergy());
         entry.setSleep(values.getSleep());
         entry.setHunger(values.getHunger());
@@ -90,11 +85,10 @@ public class ProgressService {
         Map<String, Object> s = new LinkedHashMap<>();
         // Templates read these keys directly, so every one exists even when there is no data yet.
         for (String key : List.of("firstDate", "latestDate", "latestEntry", "weeksIn", "startWeight", "currentWeight",
-                "change", "weeklyRate", "rateLow", "rateHigh", "rateStatus", "toGoal", "toGoalAbs", "projectedDate")) {
+                "change", "weeklyRate", "toGoal", "toGoalAbs", "projectedDate")) {
             s.put(key, null);
         }
         s.put("composition", Map.of("hasData", false));
-        s.put("measurements", List.of());
         s.put("feelings", List.of());
         s.put("showRecap", false);
         s.put("hasData", !entries.isEmpty());
@@ -121,10 +115,6 @@ public class ProgressService {
 
         Double weeklyRate = weeklyRate(entries, latest.getCheckInDate());
         s.put("weeklyRate", weeklyRate == null ? null : round1(weeklyRate));
-        double[] band = healthyBand(goal, current);
-        s.put("rateLow", round1(band[0]));
-        s.put("rateHigh", round1(band[1]));
-        s.put("rateStatus", rateStatus(goal, weeklyRate, band));
 
         Double goalWeight = user.getGoalWeightLbs();
         if (goalWeight != null) {
@@ -138,7 +128,6 @@ public class ProgressService {
         }
 
         s.put("composition", composition(entries));
-        s.put("measurements", measurements(entries));
         s.put("feelings", feelings(entries));
         s.put("showRecap", entries.size() >= 2);
         return s;
@@ -151,20 +140,17 @@ public class ProgressService {
         List<Double> weight = new ArrayList<>();
         List<Double> trend = new ArrayList<>();
         List<Double> bodyFat = new ArrayList<>();
-        List<Double> waist = new ArrayList<>();
         for (BodyCheckIn e : entries) {
             dates.add(e.getCheckInDate().toString());
             weight.add(e.getWeightLbs());
             trend.add(round1(averageWeight(entries, e.getCheckInDate().minusDays(WINDOW_DAYS - 1), e.getCheckInDate())));
             bodyFat.add(e.getBodyFatPct());
-            waist.add(e.getWaistIn());
         }
         Map<String, Object> data = new LinkedHashMap<>();
         data.put("dates", dates);
         data.put("weight", weight);
         data.put("trend", trend);
         data.put("bodyFat", bodyFat);
-        data.put("waist", waist);
         data.put("goalWeight", user.getGoalWeightLbs());
         return data;
     }
@@ -216,28 +202,6 @@ public class ProgressService {
         return "maintain";
     }
 
-    /**
-     * A sustainable weekly change as a share of body weight: losing 0.5 to 1% a week,
-     * gaining 0.25 to 0.5%, or holding within 0.25% either way.
-     */
-    static double[] healthyBand(String goal, double weight) {
-        switch (goal) {
-            case "lose": return new double[] {-0.01 * weight, -0.005 * weight};
-            case "build": return new double[] {0.0025 * weight, 0.005 * weight};
-            default: return new double[] {-0.0025 * weight, 0.0025 * weight};
-        }
-    }
-
-    static String rateStatus(String goal, Double rate, double[] band) {
-        if (rate == null) return "needs-data";
-        if (rate >= band[0] && rate <= band[1]) return "on-track";
-        switch (goal) {
-            case "lose": return rate < band[0] ? "too-fast" : "too-slow";
-            case "build": return rate > band[1] ? "too-fast" : "too-slow";
-            default: return rate > band[1] ? "drifting-up" : "drifting-down";
-        }
-    }
-
     private Map<String, Object> composition(List<BodyCheckIn> entries) {
         List<BodyCheckIn> withFat = entries.stream().filter(e -> e.getBodyFatPct() != null).toList();
         Map<String, Object> c = new LinkedHashMap<>();
@@ -257,27 +221,6 @@ public class ProgressService {
         c.put("leanChange", round1((latest.getWeightLbs() - currentFat) - (first.getWeightLbs() - startFat)));
         c.put("hasChange", withFat.size() >= 2);
         return c;
-    }
-
-    private List<Map<String, Object>> measurements(List<BodyCheckIn> entries) {
-        Map<String, Function<BodyCheckIn, Double>> fields = new LinkedHashMap<>();
-        fields.put("Waist", BodyCheckIn::getWaistIn);
-        fields.put("Hips", BodyCheckIn::getHipsIn);
-        fields.put("Chest", BodyCheckIn::getChestIn);
-        fields.put("Arm", BodyCheckIn::getArmIn);
-        fields.put("Thigh", BodyCheckIn::getThighIn);
-        List<Map<String, Object>> rows = new ArrayList<>();
-        fields.forEach((name, getter) -> {
-            List<Double> values = entries.stream().map(getter).filter(Objects::nonNull).toList();
-            if (values.isEmpty()) return;
-            Map<String, Object> row = new LinkedHashMap<>();
-            row.put("name", name);
-            row.put("start", round1(values.get(0)));
-            row.put("current", round1(values.get(values.size() - 1)));
-            row.put("change", round1(values.get(values.size() - 1) - values.get(0)));
-            rows.add(row);
-        });
-        return rows;
     }
 
     /** First week vs most recent week, for each 1 to 5 score. */

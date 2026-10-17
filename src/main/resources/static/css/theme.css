@@ -416,3 +416,39 @@ a:hover { color: var(--neon-purple); text-shadow: 0 0 6px rgba(45,212,255,0.6); 
   margin-top: 2px;
 }
 .neon details > summary { cursor: pointer; }
+
+/* Body measurement diagram. Desktop: inputs sit beside the figure with leader lines.
+   Phones: the figure shows numbered spots and the inputs list underneath. */
+.body-map { position: relative; }
+.body-figure { display: block; margin: 0 auto; width: 180px; height: 396px; }
+.body-figure .silhouette * { fill: rgba(45, 212, 255, 0.10); stroke: rgba(45, 212, 255, 0.55); stroke-width: 1.5; }
+.body-figure .leader { stroke: rgba(167, 139, 250, 0.55); stroke-width: 1; stroke-dasharray: 3 3; display: none; }
+.body-figure .spot { fill: var(--neon-purple); stroke: var(--bg); stroke-width: 1.5; }
+.body-figure .spot-number { fill: #0a0f1f; font-size: 8px; font-weight: 700; }
+.body-map .bm-field { margin-top: 0.5rem; }
+.body-map .bm-num {
+  display: inline-block; min-width: 1.3em; text-align: center; border-radius: 50%;
+  background: var(--neon-purple); color: #0a0f1f; font-size: 0.7rem; font-weight: 700;
+}
+@media (max-width: 767.98px) {
+  .body-map { display: grid; grid-template-columns: 1fr 1fr; column-gap: 0.75rem; }
+  .body-map .body-figure { grid-column: 1 / -1; }
+}
+@media (min-width: 768px) {
+  .body-map { width: 620px; max-width: 100%; height: 490px; margin: 0 auto; }
+  .body-figure { position: absolute; left: 200px; top: 0; width: 220px; height: 484px; }
+  .body-figure .leader { display: inline; }
+  .body-map .bm-field { position: absolute; width: 180px; margin: 0; top: calc(var(--ly) * 1.1px - 34px); }
+  .body-map .bm-field.left { left: 10px; text-align: right; }
+  .body-map .bm-field.right { left: 430px; }
+}
+
+/* Selected state for toggle buttons (figure picker, 1-5 scores). */
+.btn-check:checked + .btn-outline-neon,
+.btn-check:active + .btn-outline-neon {
+  background: linear-gradient(90deg, rgba(45, 212, 255, 0.35), rgba(167, 139, 250, 0.35));
+  border-color: var(--neon-blue);
+  color: #fff;
+  box-shadow: var(--glow);
+}
+.form-control::placeholder { color: rgba(230, 241, 255, 0.45); }

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head></head>
+<body>
+
+<!--
+  The body diagram form. Two figures (male, female) share one set of inputs; the
+  toggle only changes which figure is visible. Diagram coordinates come from BodyPart.
+-->
+<th:block th:fragment="form(diagramRows, bodyDiagram, today, earliest)">
+    <form th:action="@{/progress/measurements}" method="post" class="measure-form">
+        <div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+            <div class="btn-group" role="group" aria-label="Body diagram">
+                <input type="radio" class="btn-check" name="diagram" id="diagramMale" value="male" th:checked="${bodyDiagram == 'male'}" data-diagram-toggle>
+                <label class="btn btn-sm btn-outline-neon" for="diagramMale">Male figure</label>
+                <input type="radio" class="btn-check" name="diagram" id="diagramFemale" value="female" th:checked="${bodyDiagram == 'female'}" data-diagram-toggle>
+                <label class="btn btn-sm btn-outline-neon" for="diagramFemale">Female figure</label>
+            </div>
+            <div>
+                <label class="form-label small mb-1" for="measuredOn">Date</label>
+                <input class="form-control form-control-sm" type="date" id="measuredOn" name="date"
+                       th:value="${today}" th:max="${today}" th:min="${earliest}">
+            </div>
+        </div>
+
+        <div class="body-map">
+            <svg th:each="fig : ${ {'male','female'} }" viewBox="0 0 200 440" class="body-figure"
+                 th:attr="data-figure=${fig}" th:classappend="${fig != bodyDiagram} ? 'd-none'"
+                 role="img" th:aria-label="${fig} + ' body diagram'">
+                <g class="silhouette" th:if="${fig == 'male'}">
+                    <circle cx="100" cy="28" r="18"/>
+                    <rect x="92" y="44" width="16" height="14" rx="4"/>
+                    <path d="M60,66 Q100,56 140,66 Q148,90 144,120 Q140,150 134,180 L130,214 L70,214 L66,180 Q60,150 56,120 Q52,90 60,66 Z"/>
+                    <path d="M58,68 Q44,74 42,104 L38,170 Q36,198 34,226 Q40,232 46,228 L52,176 L58,118 Z"/>
+                    <path d="M142,68 Q156,74 158,104 L162,170 Q164,198 166,226 Q160,232 154,228 L148,176 L142,118 Z"/>
+                    <path d="M70,210 L99,210 L97,300 Q96,360 94,404 L80,406 Q76,360 75,300 Z"/>
+                    <path d="M130,210 L101,210 L103,300 Q104,360 106,404 L120,406 Q124,360 125,300 Z"/>
+                </g>
+                <g class="silhouette" th:if="${fig == 'female'}">
+                    <circle cx="100" cy="28" r="17"/>
+                    <rect x="93" y="44" width="14" height="14" rx="4"/>
+                    <path d="M68,68 Q100,60 132,68 Q138,92 132,120 Q124,148 122,170 Q136,196 140,222 L60,222 Q64,196 78,170 Q76,148 68,120 Q62,92 68,68 Z"/>
+                    <path d="M66,70 Q54,76 52,104 L48,168 Q46,196 44,222 Q50,228 55,224 L60,174 L66,116 Z"/>
+                    <path d="M134,70 Q146,76 148,104 L152,168 Q154,196 156,222 Q150,228 145,224 L140,174 L134,116 Z"/>
+                    <path d="M62,218 L99,218 L96,300 Q95,360 93,404 L80,406 Q74,360 72,300 Z"/>
+                    <path d="M138,218 L101,218 L104,300 Q105,360 107,404 L120,406 Q126,360 128,300 Z"/>
+                </g>
+                <g th:each="row : ${diagramRows}"
+                   th:with="px=${fig == 'female' ? row.part.femaleX : row.part.maleX}, py=${fig == 'female' ? row.part.femaleY : row.part.maleY}">
+                    <line class="leader" th:attr="x1=${px}, y1=${py}, x2=${row.part.edgeX}, y2=${row.part.labelY}"/>
+                    <circle class="spot" r="7" th:attr="cx=${px}, cy=${py}"/>
+                    <text class="spot-number" text-anchor="middle" dominant-baseline="central"
+                          th:attr="x=${px}, y=${py}" th:text="${row.part.number}">1</text>
+                </g>
+            </svg>
+
+            <div th:each="row : ${diagramRows}" class="bm-field" th:classappend="${row.part.side}"
+                 th:style="'--ly:' + ${row.part.labelY}">
+                <label class="form-label small mb-1" th:for="${'m_' + row.part.key}">
+                    <span class="bm-num" th:text="${row.part.number}">1</span> <span th:text="${row.part.label}">Neck</span>
+                </label>
+                <input class="form-control form-control-sm" type="number" step="0.1" inputmode="decimal"
+                       th:id="${'m_' + row.part.key}" th:name="${'m_' + row.part.key}"
+                       th:attr="min=${row.part.min}, max=${row.part.max}"
+                       th:placeholder="${row.last != null} ? 'last ' + ${row.last} : 'inches'">
+            </div>
+        </div>
+
+        <p class="text-muted small mt-3 mb-2">
+            Measure in the morning before eating, relaxed, tape snug but not squeezing. Waist at the belly button,
+            hips at the widest point, arms and thighs at the widest point, calves at the thickest point.
+            Skip any you don't track.
+        </p>
+        <button type="submit" class="btn btn-neon"><i class="bi bi-rulers"></i> Save measurements</button>
+    </form>
+</th:block>
+
+<!-- Totals, per-spot history and the chart. Used on the client's page and the coach's client page. -->
+<th:block th:fragment="history(msummary, measurementJson)">
+    <div th:if="${msummary.hasData}">
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-md-4">
+                <div class="stat-tile">
+                    <div class="stat-label" th:text="${msummary.totalLost == null || msummary.totalLost >= 0} ? 'Total inches lost' : 'Total inches gained'">Total inches lost</div>
+                    <div class="stat-value" th:text="${msummary.totalAbs != null} ? ${msummary.totalAbs} + ' in' : '--'">--</div>
+                    <div class="stat-sub" th:text="${msummary.totalLost != null} ? 'across every spot since ' + ${#temporals.format(msummary.firstDate, 'MMM d')} : 'after your second session'">since</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4" th:if="${msummary.waistChange != null}">
+                <div class="stat-tile">
+                    <div class="stat-label">Waist</div>
+                    <div class="stat-value" th:text="(${msummary.waistChange} > 0 ? '+' : '') + ${msummary.waistChange} + ' in'">0</div>
+                </div>
+            </div>
+            <div class="col-12 col-md-4">
+                <div class="stat-tile">
+                    <div class="stat-label">Sessions</div>
+                    <div class="stat-value" th:text="${msummary.sessionCount}">0</div>
+                    <div class="stat-sub" th:text="'Last ' + ${#temporals.format(msummary.lastDate, 'MMM d')} + ' · next ' + ${#temporals.format(msummary.nextDue, 'MMM d')}">dates</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-responsive mb-3">
+            <table class="table table-dark mb-0">
+                <thead><tr><th>Spot</th><th class="d-none d-sm-table-cell">First</th><th class="d-none d-sm-table-cell">Last time</th><th>Now</th><th>Since last</th><th>Total</th></tr></thead>
+                <tbody>
+                <tr th:each="r : ${msummary.rows}">
+                    <th th:text="${r.label}">Waist</th>
+                    <td class="d-none d-sm-table-cell" th:text="${r.first}">0</td>
+                    <td class="d-none d-sm-table-cell" th:text="${r.previous != null} ? ${r.previous} : '--'">0</td>
+                    <td th:text="${r.latest}">0</td>
+                    <td th:text="${r.sinceLast != null} ? ((${r.sinceLast} > 0 ? '+' : '') + ${r.sinceLast}) : '--'">0</td>
+                    <td th:text="${r.total != null} ? ((${r.total} > 0 ? '+' : '') + ${r.total}) : '--'">0</td>
+                </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <script id="measurementData" type="application/json" th:utext="${measurementJson}">{}</script>
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+            <h6 class="mb-0">Trend</h6>
+            <select class="form-select form-select-sm w-auto" id="measurementPicker" aria-label="Measurement to chart"></select>
+        </div>
+        <div style="position: relative; height: 220px;"><canvas id="measurementChart" aria-label="Measurement chart" role="img"></canvas></div>
+    </div>
+    <div th:unless="${msummary.hasData}" class="empty-state">No measurements yet.</div>
+</th:block>
+
+</body>
+</html>

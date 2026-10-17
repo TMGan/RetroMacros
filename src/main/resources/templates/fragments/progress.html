@@ -22,17 +22,10 @@
         </div>
         <div class="col-6 col-lg-3">
             <div class="card neon h-100"><div class="card-body stat-tile">
-                <div class="stat-label">Weekly rate</div>
+                <!-- Deliberately just the number: no judgment on pace. Everyone's body responds differently. -->
+                <div class="stat-label">Weekly trend</div>
                 <div class="stat-value" th:text="${summary.weeklyRate != null} ? ((${summary.weeklyRate} > 0 ? '+' : '') + ${summary.weeklyRate} + ' lb') : '--'">--</div>
-                <div class="stat-sub" th:switch="${summary.rateStatus}">
-                    <span th:case="'on-track'" class="text-success">On track for your goal</span>
-                    <span th:case="'too-fast'" class="text-warning">Faster than recommended</span>
-                    <span th:case="'too-slow'">Slower than planned</span>
-                    <span th:case="'drifting-up'">Drifting up</span>
-                    <span th:case="'drifting-down'">Drifting down</span>
-                    <span th:case="*">Needs 2 weeks of weigh-ins</span>
-                </div>
-                <div class="stat-sub" th:text="'Healthy: ' + ${summary.rateLow} + ' to ' + ${summary.rateHigh} + ' lb/week'">Healthy range</div>
+                <div class="stat-sub" th:text="${summary.weeklyRate != null} ? 'per week, last 4 weeks' : 'Shows after 2 weeks of weigh-ins'">per week</div>
             </div></div>
         </div>
         <div class="col-6 col-lg-3">
@@ -57,16 +50,10 @@
         </div>
     </div>
     <div class="row g-3 mb-4">
-        <div class="col-12 col-lg-6" data-chart-card>
+        <div class="col-12" data-chart-card>
             <div class="card neon h-100"><div class="card-body">
                 <h5 class="mb-3">Body fat %</h5>
                 <div style="position: relative; height: 220px;"><canvas id="bodyFatChart" aria-label="Body fat chart" role="img"></canvas></div>
-            </div></div>
-        </div>
-        <div class="col-12 col-lg-6" data-chart-card>
-            <div class="card neon h-100"><div class="card-body">
-                <h5 class="mb-3">Waist</h5>
-                <div style="position: relative; height: 220px;"><canvas id="waistChart" aria-label="Waist chart" role="img"></canvas></div>
             </div></div>
         </div>
     </div>
@@ -87,23 +74,6 @@
                         <td th:if="${summary.composition.hasChange}" th:text="(${summary.composition.fatChange} > 0 ? '+' : '') + ${summary.composition.fatChange} + ' lb'">0</td></tr>
                     <tr><th>Lean mass</th><td th:text="${summary.composition.startLean} + ' lb'">0</td><td th:text="${summary.composition.currentLean} + ' lb'">0</td>
                         <td th:if="${summary.composition.hasChange}" th:text="(${summary.composition.leanChange} > 0 ? '+' : '') + ${summary.composition.leanChange} + ' lb'">0</td></tr>
-                    </tbody>
-                </table>
-            </div></div>
-        </div>
-
-        <div class="col-12 col-lg-6" th:if="${summary.measurements != null && !#lists.isEmpty(summary.measurements)}">
-            <div class="card neon h-100"><div class="card-body">
-                <h5 class="mb-3">Measurements (inches)</h5>
-                <table class="table table-dark mb-0">
-                    <thead><tr><th></th><th>Start</th><th>Now</th><th>Change</th></tr></thead>
-                    <tbody>
-                    <tr th:each="m : ${summary.measurements}">
-                        <th th:text="${m.name}">Waist</th>
-                        <td th:text="${m.start}">0</td>
-                        <td th:text="${m.current}">0</td>
-                        <td th:text="(${m.change} > 0 ? '+' : '') + ${m.change}">0</td>
-                    </tr>
                     </tbody>
                 </table>
             </div></div>
@@ -155,7 +125,7 @@
 </th:block>
 
 <!-- Week 1 vs now, for the end of the challenge. -->
-<th:block th:fragment="recap(summary)">
+<th:block th:fragment="recap(summary, msummary)">
     <div class="card neon mb-4" th:if="${summary.showRecap}">
         <div class="card-body">
             <h5 class="mb-1">Challenge recap</h5>
@@ -174,9 +144,9 @@
                     <div class="stat-tile"><div class="stat-label">Fat mass</div>
                         <div class="stat-value" th:text="(${summary.composition.fatChange} > 0 ? '+' : '') + ${summary.composition.fatChange} + ' lb'">0</div></div>
                 </div>
-                <div class="col-6 col-md-3" th:each="m : ${summary.measurements}" th:if="${m.name == 'Waist'}">
-                    <div class="stat-tile"><div class="stat-label">Waist</div>
-                        <div class="stat-value" th:text="(${m.change} > 0 ? '+' : '') + ${m.change} + ' in'">0</div></div>
+                <div class="col-6 col-md-3" th:if="${msummary.totalAbs != null}">
+                    <div class="stat-tile"><div class="stat-label" th:text="${msummary.totalLost >= 0} ? 'Inches lost' : 'Inches gained'">Inches lost</div>
+                        <div class="stat-value" th:text="${msummary.totalAbs} + ' in'">0</div></div>
                 </div>
             </div>
         </div>

@@ -2,6 +2,8 @@ package com.mealplanner.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mealplanner.model.BodyCheckIn;
+import com.mealplanner.model.BodyPart;
+import com.mealplanner.model.MeasurementEntry;
 import com.mealplanner.model.FoodLog;
 import com.mealplanner.model.GroceryList;
 import com.mealplanner.model.MacroTargets;
@@ -47,6 +49,7 @@ public class DemoAccountService {
     private final LearnedUserPreferenceRepository learnedUserPreferenceRepository;
     private final UserFoodPreferencesRepository userFoodPreferencesRepository;
     private final com.mealplanner.repository.BodyCheckInRepository bodyCheckInRepository;
+    private final com.mealplanner.repository.MeasurementEntryRepository measurementRepository;
     private final MealPlanService mealPlanService;
     private final MacroCalculatorService macroCalculatorService;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -58,6 +61,7 @@ public class DemoAccountService {
                               LearnedUserPreferenceRepository learnedUserPreferenceRepository,
                               UserFoodPreferencesRepository userFoodPreferencesRepository,
                               com.mealplanner.repository.BodyCheckInRepository bodyCheckInRepository,
+                              com.mealplanner.repository.MeasurementEntryRepository measurementRepository,
                               MealPlanService mealPlanService,
                               MacroCalculatorService macroCalculatorService) {
         this.userRepository = userRepository;
@@ -67,6 +71,7 @@ public class DemoAccountService {
         this.learnedUserPreferenceRepository = learnedUserPreferenceRepository;
         this.userFoodPreferencesRepository = userFoodPreferencesRepository;
         this.bodyCheckInRepository = bodyCheckInRepository;
+        this.measurementRepository = measurementRepository;
         this.mealPlanService = mealPlanService;
         this.macroCalculatorService = macroCalculatorService;
     }
@@ -88,6 +93,7 @@ public class DemoAccountService {
         demo.setLastLoginAt(LocalDateTime.now());
         demo.setLastActiveAt(LocalDateTime.now());
         demo.setGoalWeightLbs(178.0);
+        demo.setBodyDiagram("male");
         demo = userRepository.save(demo);
 
         wipe(demo);
@@ -96,6 +102,7 @@ public class DemoAccountService {
         seedFoodLogs(demo);
         seedMealPlan(demo);
         seedCheckIns(demo);
+        seedMeasurements(demo);
         return demo;
     }
 
@@ -110,6 +117,7 @@ public class DemoAccountService {
                 learnedUserPreferenceRepository.findByUserOrderByConfidenceScoreDesc(demo));
         userFoodPreferencesRepository.findByUser(demo).ifPresent(userFoodPreferencesRepository::delete);
         bodyCheckInRepository.deleteAll(bodyCheckInRepository.findByUserOrderByCheckInDateAsc(demo));
+        measurementRepository.deleteAll(measurementRepository.findByUserOrderByMeasuredOnAsc(demo));
     }
 
     private void seedFoodLogs(User demo) {
@@ -155,7 +163,6 @@ public class DemoAccountService {
             // Body fat, waist and how they feel on the weekly "full" check-ins.
             if (d % 7 == 0 || d == 34) {
                 entry.setBodyFatPct(Math.round((20.0 + d * 0.053) * 10) / 10.0);
-                entry.setWaistIn(Math.round((35.1 + d * 0.04) * 10) / 10.0);
                 int week = (34 - d) / 7;
                 entry.setEnergy(Math.min(5, 2 + week / 2 + 1));
                 entry.setSleep(Math.min(5, 3 + week / 3));
@@ -163,6 +170,26 @@ public class DemoAccountService {
                 entry.setStress(Math.max(2, 4 - week / 3));
             }
             bodyCheckInRepository.save(entry);
+        }
+    }
+
+    /** Two tape-measure sessions about four weeks apart, so the demo shows inches lost. */
+    private void seedMeasurements(User demo) {
+        LocalDate today = LocalDate.now();
+        double[][] sessions = {
+                // neck, shoulders, chest, R arm, L arm, waist, hips, R thigh, L thigh, R calf, L calf
+                {15.8, 48.5, 41.5, 14.4, 14.6, 36.9, 40.2, 23.8, 23.6, 15.4, 15.3},
+                {15.6, 48.6, 41.0, 14.6, 14.8, 35.4, 39.3, 23.1, 22.9, 15.3, 15.2}
+        };
+        int[] daysAgo = {34, 6};
+        BodyPart[] order = {BodyPart.NECK, BodyPart.SHOULDERS, BodyPart.CHEST, BodyPart.ARM_RIGHT, BodyPart.ARM_LEFT,
+                BodyPart.WAIST, BodyPart.HIPS, BodyPart.THIGH_RIGHT, BodyPart.THIGH_LEFT, BodyPart.CALF_RIGHT, BodyPart.CALF_LEFT};
+        for (int s = 0; s < sessions.length; s++) {
+            MeasurementEntry entry = new MeasurementEntry();
+            entry.setUser(demo);
+            entry.setMeasuredOn(today.minusDays(daysAgo[s]));
+            for (int i = 0; i < order.length; i++) order[i].set(entry, sessions[s][i]);
+            measurementRepository.save(entry);
         }
     }
 
@@ -174,7 +201,7 @@ public class DemoAccountService {
         profile.setAge(28);
         profile.setSex("Male");
         profile.setActivityLevel("Moderately Active");
-        profile.setFitnessGoal("Build Muscle");
+        profile.setFitnessGoal("Lose Weight");
         profile.setAllergies(List.of());
 
         double bmr = macroCalculatorService.calculateBMR(
