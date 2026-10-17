@@ -14,7 +14,8 @@ import java.time.ZoneOffset;
 @Service
 public class AiQuotaService {
 
-    public enum Kind { PLAN, SWAP, ESTIMATE }
+    /** AI kinds cap spend; the rest cap how much any account (including the public demo) can write per day. */
+    public enum Kind { PLAN, SWAP, ESTIMATE, FOOD_LOG, SWAP_RECORD, PLAN_SAVE }
 
     public static class QuotaExceededException extends RuntimeException {
         public QuotaExceededException(String message) {
@@ -26,11 +27,20 @@ public class AiQuotaService {
     private final int plansPerDay;
     private final int swapsPerDay;
     private final int estimatesPerDay;
+    private final int foodLogsPerDay;
+    private final int swapRecordsPerDay;
+    private final int planSavesPerDay;
 
     public AiQuotaService(AiUsageRepository aiUsageRepository,
                           @Value("${ai.limit.plans-per-day:3}") int plansPerDay,
                           @Value("${ai.limit.swaps-per-day:15}") int swapsPerDay,
-                          @Value("${ai.limit.estimates-per-day:40}") int estimatesPerDay) {
+                          @Value("${ai.limit.estimates-per-day:40}") int estimatesPerDay,
+                          @Value("${app.limit.food-logs-per-day:100}") int foodLogsPerDay,
+                          @Value("${app.limit.swap-records-per-day:50}") int swapRecordsPerDay,
+                          @Value("${app.limit.plan-saves-per-day:20}") int planSavesPerDay) {
+        this.foodLogsPerDay = foodLogsPerDay;
+        this.swapRecordsPerDay = swapRecordsPerDay;
+        this.planSavesPerDay = planSavesPerDay;
         this.aiUsageRepository = aiUsageRepository;
         this.plansPerDay = plansPerDay;
         this.swapsPerDay = swapsPerDay;
@@ -56,6 +66,9 @@ public class AiQuotaService {
         switch (kind) {
             case PLAN: return plansPerDay;
             case SWAP: return swapsPerDay;
+            case FOOD_LOG: return foodLogsPerDay;
+            case SWAP_RECORD: return swapRecordsPerDay;
+            case PLAN_SAVE: return planSavesPerDay;
             default: return estimatesPerDay;
         }
     }
@@ -64,6 +77,9 @@ public class AiQuotaService {
         switch (kind) {
             case PLAN: return "meal plans";
             case SWAP: return "meal swaps";
+            case FOOD_LOG: return "food log entries";
+            case SWAP_RECORD: return "recorded swaps";
+            case PLAN_SAVE: return "saved plans";
             default: return "macro estimates";
         }
     }

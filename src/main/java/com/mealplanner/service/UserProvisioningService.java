@@ -46,6 +46,15 @@ public class UserProvisioningService {
         }
     }
 
+    public boolean isInviteOnly() {
+        return inviteOnly;
+    }
+
+    /** Whether this email may use the app right now: an admin, or on the invite list. */
+    public boolean isAllowed(String email) {
+        return !inviteOnly || isAdminEmail(email) || (email != null && allowedEmailRepository.existsByEmailIgnoreCase(email.trim()));
+    }
+
     public boolean isAdminEmail(String email) {
         return email != null && adminEmails.contains(email.trim().toLowerCase(Locale.ROOT));
     }
@@ -87,8 +96,9 @@ public class UserProvisioningService {
         if (name != null && (user.getName() == null || user.getName().isBlank())) {
             user.setName(name);
         }
-        if (admin) {
-            user.setAdmin(true);
+        // Admin follows ADMIN_EMAILS on every sign-in, so removing someone from it takes their access away.
+        if (admin != user.isAdmin()) {
+            user.setAdmin(admin);
         }
         return userRepository.save(user);
     }

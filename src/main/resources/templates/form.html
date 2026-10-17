@@ -46,7 +46,7 @@
 
             <div class="col-md-2">
                 <label for="age" class="form-label">Age</label>
-                <input type="number" class="form-control" id="age" name="age" placeholder="e.g., 30" min="13" max="100" required th:value="${param.age}">
+                <input type="number" class="form-control" id="age" name="age" placeholder="e.g., 30" min="18" max="100" required th:value="${param.age}">
                 <div class="invalid-feedback">Please enter a valid age (13-100).</div>
             </div>
 
@@ -213,7 +213,7 @@
                     }
                 }, false)
             })
-    })()
+    })();  // this semicolon matters: without it the next block is parsed as a call and never runs
 
     // Show/hide body fat field based on formula selection
     (function() {

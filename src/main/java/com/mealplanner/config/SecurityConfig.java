@@ -12,10 +12,24 @@ import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+    private static final String CONTENT_SECURITY_POLICY = String.join("; ",
+            "default-src 'self'",
+            "script-src 'self' 'unsafe-inline'",
+            "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com",
+            "font-src 'self' https://cdn.jsdelivr.net https://fonts.gstatic.com",
+            // Google profile pictures come from googleusercontent.com.
+            "img-src 'self' data: https://*.googleusercontent.com",
+            "connect-src 'self'",
+            "frame-ancestors 'self'",
+            "form-action 'self'",
+            "base-uri 'self'",
+            "object-src 'none'");
 
     private final CustomOAuth2UserService customOAuth2UserService;
     private final UserProvisioningService userProvisioningService;
@@ -54,7 +68,13 @@ public class SecurityConfig {
                 .invalidateHttpSession(true)
                 .deleteCookies("JSESSIONID")
             )
-            .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
+            .headers(headers -> headers
+                .frameOptions(frame -> frame.sameOrigin())
+                // Only our own scripts may run. 'unsafe-inline' is still needed for the inline
+                // onclick handlers in the templates; the rest still blocks injected third-party code.
+                .contentSecurityPolicy(csp -> csp.policyDirectives(CONTENT_SECURITY_POLICY))
+                .referrerPolicy(referrer -> referrer.policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                .permissionsPolicyHeader(permissions -> permissions.policy("camera=(), microphone=(), geolocation=(), payment=(), usb=()")));
 
         if (h2ConsoleEnabled) {
             http.csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"));

@@ -51,7 +51,7 @@
 
 <!-- Scripts every admin page needs. -->
 <th:block th:fragment="scripts">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
     <script th:src="@{/js/confirm-click.js}"></script>
     <script>
         // Rows with data-href open that page when clicked anywhere outside a button or link.

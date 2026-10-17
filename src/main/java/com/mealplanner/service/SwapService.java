@@ -147,7 +147,7 @@ public class SwapService {
 
     public String buildLearnedPreferencesPrompt(User user) {
         List<LearnedUserPreference> list = preferenceRepository
-                .findByUserAndConfidenceScoreGreaterThanEqual(user, new BigDecimal("0.70"));
+                .findTop15ByUserAndConfidenceScoreGreaterThanEqualOrderByConfidenceScoreDescTimesObservedDesc(user, new BigDecimal("0.70"));
         if (list == null || list.isEmpty()) return "";
         StringBuilder sb = new StringBuilder();
         sb.append("LEARNED FROM THE CLIENT'S PAST SWAPS:\n");

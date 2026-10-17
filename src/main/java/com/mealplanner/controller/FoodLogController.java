@@ -122,6 +122,12 @@ public class FoodLogController {
                 userRepository.save(user);
             } catch (Exception ignore) {}
         }
+        // Caps writes for every account, including the public demo, so nobody can fill the database.
+        try {
+            aiQuotaService.consume(user, AiQuotaService.Kind.FOOD_LOG);
+        } catch (AiQuotaService.QuotaExceededException e) {
+            return e.getMessage();
+        }
         ZoneId zone = foodLogService.zoneFor(user);
 
         FoodLog foodLog = new FoodLog();
@@ -207,6 +213,12 @@ public class FoodLogController {
         User user = currentUserService.require(principal);
         Map<String, Object> response = new HashMap<>();
         try {
+            // Check the input before charging it against the daily AI limit.
+            if (!isUsableDescription(foodDescription)) {
+                response.put("success", false);
+                response.put("error", "Please enter a valid food description.");
+                return ResponseEntity.ok(response);
+            }
             boolean offline = currentUserService.isDemo(user);
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
             Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(user, foodDescription, offline);
@@ -265,6 +277,12 @@ public class FoodLogController {
         User user = currentUserService.require(principal);
         Map<String, Object> response = new HashMap<>();
         try {
+            // Check the input before charging it against the daily AI limit.
+            if (!isUsableDescription(foodDescription)) {
+                response.put("success", false);
+                response.put("error", "Please enter a valid food description.");
+                return ResponseEntity.ok(response);
+            }
             boolean offline = currentUserService.isDemo(user);
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
             Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(user, foodDescription, offline);
@@ -286,6 +304,11 @@ public class FoodLogController {
             response.put("error", "Couldn't estimate macros. Please enter them manually.");
             return ResponseEntity.status(500).body(response);
         }
+    }
+
+    private boolean isUsableDescription(String description) {
+        String d = description == null ? "" : description.trim();
+        return d.length() >= 3 && d.length() <= MAX_DESCRIPTION_LENGTH;
     }
 
     private ResponseEntity<Map<String, Object>> quotaResponse(AiQuotaService.QuotaExceededException e) {

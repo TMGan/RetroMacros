@@ -50,7 +50,7 @@ public class MealPlanService {
     /** @param user who the plan is for; AI usage and cost are recorded against them */
     public MealPlan generateMealPlan(User user, UserProfile profile, MacroTargets targets, String extraPrompt) throws RuntimeException {
         if (mockMode) {
-            return generateMockMealPlan(profile, targets);
+            return checkedSamplePlan(profile, targets);
         }
         List<String> allergies = profile.getAllergies();
         String prompt = buildPlanPrompt(profile, targets, extraPrompt);
@@ -94,7 +94,18 @@ public class MealPlanService {
 
     /** Built-in offline plan. Never calls the paid API, whatever ai.mock is set to. */
     public MealPlan generateSampleMealPlan(UserProfile profile, MacroTargets targets) {
-        return generateMockMealPlan(profile, targets);
+        return checkedSamplePlan(profile, targets);
+    }
+
+    // The sample menu is fixed and can't work around allergies, so refuse rather than serve one that conflicts.
+    private MealPlan checkedSamplePlan(UserProfile profile, MacroTargets targets) {
+        MealPlan plan = generateMockMealPlan(profile, targets);
+        Set<String> violations = AllergenGuard.violations(profile.getAllergies(), plan);
+        if (!violations.isEmpty()) {
+            throw new AiClient.AiException("The sample plan contains " + String.join(", ", violations)
+                    + ", so it can't be shown with your allergies. Personalized plans that avoid them are coming soon.", null);
+        }
+        return plan;
     }
 
     public GroceryList generateGroceryList(MealPlan plan) {
