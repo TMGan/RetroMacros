@@ -28,7 +28,10 @@ public class PagesController {
     }
 
     @GetMapping("/about")
-    public String about() {
+    public String about(@AuthenticationPrincipal OAuth2User principal, Model model) {
+        // Public page, but signed-in visitors get the signed-in header so they don't look logged out.
+        User user = currentUserService.find(principal);
+        if (user != null) model.addAttribute("user", user);
         return "about";
     }
 

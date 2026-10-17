@@ -12,6 +12,7 @@ import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserService;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 
 @Configuration
@@ -66,7 +67,7 @@ public class SecurityConfig {
                 .logoutUrl("/logout")
                 .logoutSuccessUrl("/home")
                 .invalidateHttpSession(true)
-                .deleteCookies("JSESSIONID")
+                .deleteCookies("SESSION", "JSESSIONID")
             )
             .headers(headers -> headers
                 .frameOptions(frame -> frame.sameOrigin())
@@ -79,6 +80,9 @@ public class SecurityConfig {
         if (h2ConsoleEnabled) {
             http.csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"));
         }
+
+        // Create the CSRF token before rendering; see CsrfEagerLoadFilter.
+        http.addFilterAfter(new CsrfEagerLoadFilter(), CsrfFilter.class);
 
         return http.build();
     }

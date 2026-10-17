@@ -173,9 +173,12 @@ class SecurityPassTwoTest {
 
     @Test
     void demoLoginIssuesANewSessionId() throws Exception {
-        var before = new org.springframework.mock.web.MockHttpSession();
-        String oldId = before.getId();
-        var result = mvc.perform(post("/demo-login").session(before).with(csrf())).andReturn();
-        assertThat(result.getRequest().getSession(false).getId()).isNotEqualTo(oldId);
+        // The login page starts a session (for its form token); demo sign-in must replace it.
+        jakarta.servlet.http.Cookie before = mvc.perform(get("/login")).andReturn().getResponse().getCookie("SESSION");
+        assertThat(before).isNotNull();
+        jakarta.servlet.http.Cookie after = mvc.perform(post("/demo-login").cookie(before).with(csrf()))
+                .andReturn().getResponse().getCookie("SESSION");
+        assertThat(after).isNotNull();
+        assertThat(after.getValue()).isNotEqualTo(before.getValue());
     }
 }

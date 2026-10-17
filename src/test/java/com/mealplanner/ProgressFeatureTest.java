@@ -177,12 +177,14 @@ class ProgressFeatureTest {
         mvc.perform(get("/admin").with(signedInAs(coach)))
                 .andExpect(content().string(containsString("Missed check-in")));
 
+        jakarta.servlet.http.Cookie viewAs = mvc.perform(post("/admin/users/" + client.getId() + "/impersonate").with(signedInAs(coach)).with(csrf()))
+                .andReturn().getResponse().getCookie("SESSION");
         mvc.perform(get("/progress").with(signedInAs(coach))
-                        .sessionAttr("impersonating", true).sessionAttr("impersonateUserId", client.getId()))
+                        .cookie(viewAs))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("197.5")));
         mvc.perform(checkIn("150").with(signedInAs(coach)).with(csrf())
-                        .sessionAttr("impersonating", true).sessionAttr("impersonateUserId", client.getId()))
+                        .cookie(viewAs))
                 .andExpect(status().isForbidden());
     }
 

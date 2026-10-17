@@ -77,6 +77,12 @@
       <version>4.5.1</version>
     </dependency>
 
+    <!-- Sessions stored in the database, so sign-ins survive deploys and restarts -->
+    <dependency>
+      <groupId>org.springframework.session</groupId>
+      <artifactId>spring-session-jdbc</artifactId>
+    </dependency>
+
     <!-- Security + OAuth2 Client -->
     <dependency>
       <groupId>org.springframework.boot</groupId>

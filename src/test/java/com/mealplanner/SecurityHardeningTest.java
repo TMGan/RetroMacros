@@ -206,12 +206,15 @@ class SecurityHardeningTest {
         newLog(client);
         long auditBefore = auditLogRepository.count();
 
-        mvc.perform(post("/admin/users/" + client.getId() + "/impersonate").with(signedInAs(coach)).with(csrf()))
-                .andExpect(redirectedUrl("/dashboard"));
+        // Sessions live in the database, so carry the session cookie like a browser would.
+        jakarta.servlet.http.Cookie viewAs = mvc.perform(post("/admin/users/" + client.getId() + "/impersonate").with(signedInAs(coach)).with(csrf()))
+                .andExpect(redirectedUrl("/dashboard"))
+                .andReturn().getResponse().getCookie("SESSION");
+        assertThat(viewAs).isNotNull();
         assertThat(auditLogRepository.count()).isEqualTo(auditBefore + 1);
 
         mvc.perform(get("/dashboard").with(signedInAs(coach))
-                        .sessionAttr("impersonating", true).sessionAttr("impersonateUserId", client.getId()))
+                        .cookie(viewAs))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("read-only")))
                 .andExpect(content().string(containsString("chicken and rice")));
@@ -219,13 +222,13 @@ class SecurityHardeningTest {
         mvc.perform(post("/food-log/add").param("mealName", "Lunch").param("foodDescription", "rice")
                         .param("calories", "200").param("protein", "4").param("carbs", "45").param("fat", "0")
                         .with(signedInAs(coach)).with(csrf())
-                        .sessionAttr("impersonating", true).sessionAttr("impersonateUserId", client.getId()))
+                        .cookie(viewAs))
                 .andExpect(status().isForbidden());
 
         // A non-admin cannot use the session flags to see someone else's data.
         User other = newUser(false);
         mvc.perform(get("/dashboard").with(signedInAs(other))
-                        .sessionAttr("impersonating", true).sessionAttr("impersonateUserId", client.getId()))
+                        .cookie(viewAs))
                 .andExpect(status().isOk())
                 .andExpect(content().string(org.hamcrest.Matchers.not(containsString("chicken and rice"))));
     }
