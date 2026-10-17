@@ -10,7 +10,7 @@
     <link rel="stylesheet" th:href="@{/css/theme.css}" />
 </head>
 <body class="neon">
-<div th:replace="~{fragments/navbar :: public-navbar}"></div>
+<div th:replace="${user != null} ? ~{fragments/navbar :: authenticated-navbar} : ~{fragments/navbar :: public-navbar}"></div>
 
 <div class="container my-5">
     <div class="row">
