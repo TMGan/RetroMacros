@@ -1,6 +1,7 @@
 package com.mealplanner.controller;
 
 import com.mealplanner.model.FoodLog;
+import com.mealplanner.model.SavedMealPlan;
 import com.mealplanner.model.User;
 import com.mealplanner.repository.UserRepository;
 import com.mealplanner.service.AiQuotaService;
@@ -36,10 +37,20 @@ public class FoodLogController {
     private final CurrentUserService currentUserService;
     private final AiQuotaService aiQuotaService;
 
+    private final com.mealplanner.repository.SavedMealPlanRepository savedMealPlanRepository;
+    private final com.mealplanner.service.UserFoodPreferencesService preferencesService;
+    private final com.mealplanner.service.SwapService swapService;
+
     public FoodLogController(FoodLogService foodLogService,
                              UserRepository userRepository,
                              CurrentUserService currentUserService,
-                             AiQuotaService aiQuotaService) {
+                             AiQuotaService aiQuotaService,
+                             com.mealplanner.repository.SavedMealPlanRepository savedMealPlanRepository,
+                             com.mealplanner.service.UserFoodPreferencesService preferencesService,
+                             com.mealplanner.service.SwapService swapService) {
+        this.savedMealPlanRepository = savedMealPlanRepository;
+        this.preferencesService = preferencesService;
+        this.swapService = swapService;
         this.foodLogService = foodLogService;
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
@@ -156,7 +167,11 @@ public class FoodLogController {
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
             if (targetCalories == null) targetCalories = 500;
             targetCalories = Math.max(100, Math.min(2000, targetCalories));
-            Map<String, Object> suggestion = foodLogService.generateRandomHealthyMeal(user, targetCalories, offline);
+            // Same allergies (from the latest plan) and preferences the meal plans follow.
+            List<SavedMealPlan> latest = savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user);
+            List<String> allergies = latest.isEmpty() ? List.of() : latest.get(0).getAllergyList();
+            String preferences = preferencesService.buildPreferencesPrompt(user) + "\n" + swapService.buildLearnedPreferencesPrompt(user);
+            Map<String, Object> suggestion = foodLogService.generateRandomHealthyMeal(user, targetCalories, offline, allergies, preferences);
             if (suggestion == null) {
                 response.put("success", false);
                 response.put("error", "Could not generate suggestion.");

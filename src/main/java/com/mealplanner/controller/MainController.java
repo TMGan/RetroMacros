@@ -147,7 +147,7 @@ public class MainController {
                 aiQuotaService.consume(user, AiQuotaService.Kind.PLAN);
                 String preferencesExtra = preferencesService.buildPreferencesPrompt(user);
                 String learnedExtra = swapService.buildLearnedPreferencesPrompt(user);
-                String combinedExtra = (preferencesExtra == null ? "" : preferencesExtra) + (learnedExtra == null ? "" : learnedExtra);
+                String combinedExtra = (preferencesExtra == null ? "" : preferencesExtra) + "\n" + (learnedExtra == null ? "" : learnedExtra);
                 if (!combinedExtra.isBlank()) {
                     mealPlan = mealPlanService.generateMealPlan(user, profile, targets, combinedExtra);
                 } else {
@@ -170,6 +170,7 @@ public class MainController {
             saved.setTargetProtein(targets.getProtein());
             saved.setTargetCarbs(targets.getCarbs());
             saved.setTargetFat(targets.getFat());
+            saved.setAllergies(String.join(", ", allAllergies));
             try {
                 // Optional: reflect selected formula in saved JSON metadata later if desired
                 // Not persisting formula fields to entity to keep migration simple

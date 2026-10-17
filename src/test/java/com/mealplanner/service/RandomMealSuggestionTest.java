@@ -23,6 +23,15 @@ class RandomMealSuggestionTest {
     }
 
     @Test
+    void offlineSuggestionsNeverIncludeTheClientsAllergens() {
+        for (int i = 0; i < 30; i++) {
+            Map<String, Object> meal = service.generateRandomHealthyMeal(null, 500, true, List.of("Dairy", "Eggs", "Fish"), null);
+            String text = (meal.get("description") + " " + meal.get("ingredients")).toLowerCase();
+            assertThat(text).doesNotContain("yogurt", "cheese", "egg ", "eggs", "salmon", "tuna", "butter");
+        }
+    }
+
+    @Test
     void parsesAiSuggestionWithQuotesNewlinesAndCodeFences() throws Exception {
         String modelText = "```json\n{\"name\": \"Chicken \\\"Power\\\" Bowl\",\n"
                 + " \"ingredients\": [\"6 oz chicken breast\", \"1 cup cooked rice\", \"1 cup broccoli\", \"1 tsp olive oil\"],\n"

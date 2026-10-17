@@ -198,17 +198,19 @@
         Array.prototype.slice.call(forms)
             .forEach(function (form) {
                 form.addEventListener('submit', function (event) {
+                    form.classList.add('was-validated')
                     if (!form.checkValidity()) {
                         event.preventDefault()
                         event.stopPropagation()
+                        return  // leave the button usable so they can fix the form and resubmit
                     }
                     const btn = document.getElementById('submitBtn')
                     if (btn) {
                         const spin = btn.querySelector('.spinner-border')
                         if (spin) spin.classList.remove('d-none')
+                        btn.lastElementChild.textContent = 'Building your plan, this takes about a minute...'
                         btn.setAttribute('disabled', 'true')
                     }
-                    form.classList.add('was-validated')
                 }, false)
             })
     })()

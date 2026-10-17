@@ -150,7 +150,7 @@ public class SwapService {
                 .findByUserAndConfidenceScoreGreaterThanEqual(user, new BigDecimal("0.70"));
         if (list == null || list.isEmpty()) return "";
         StringBuilder sb = new StringBuilder();
-        sb.append("\n\nLEARNED USER PREFERENCES (High Confidence):\n");
+        sb.append("LEARNED FROM THE CLIENT'S PAST SWAPS:\n");
         for (LearnedUserPreference p : list) {
             if ("prefers_over".equals(p.getPreferenceType())) {
                 sb.append(String.format("- Prefers %s over %s (confidence: %.0f%%)\n",
@@ -160,8 +160,7 @@ public class SwapService {
                         p.getFoodItem(), p.getConfidenceScore().multiply(new BigDecimal("100")).doubleValue()));
             }
         }
-        sb.append("\nIMPORTANT: Use their preferred foods. Avoid disliked foods.\n");
-        sb.append("Remember: ALWAYS use white rice, never brown rice.\n");
+        sb.append("Lean toward the foods they prefer and away from the ones they swap out.\n");
         return sb.toString();
     }
 }

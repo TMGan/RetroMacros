@@ -53,6 +53,10 @@ public class SavedMealPlan {
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
+    // Allergies entered for this plan, comma separated. Swaps reuse them.
+    @Column(columnDefinition = "TEXT")
+    private String allergies;
+
     public SavedMealPlan() {
         this.createdAt = LocalDateTime.now();
     }
@@ -103,5 +107,11 @@ public class SavedMealPlan {
     public boolean isGenerationFailed() { return generationFailed; }
     public void setGenerationFailed(boolean generationFailed) { this.generationFailed = generationFailed; }
     public String getErrorMessage() { return errorMessage; }
+    public String getAllergies() { return allergies; }
+    public void setAllergies(String allergies) { this.allergies = allergies; }
+    public java.util.List<String> getAllergyList() {
+        if (allergies == null || allergies.isBlank()) return java.util.List.of();
+        return java.util.Arrays.stream(allergies.split(",")).map(String::trim).filter(s -> !s.isEmpty()).toList();
+    }
     public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
 }
