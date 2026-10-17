@@ -70,6 +70,12 @@
       <groupId>org.webjars</groupId>
       <artifactId>webjars-locator-core</artifactId>
     </dependency>
+    <!-- Chart.js for progress charts, served by the app so the CSP stays 'self'-only for scripts -->
+    <dependency>
+      <groupId>org.webjars.npm</groupId>
+      <artifactId>chart.js</artifactId>
+      <version>4.5.1</version>
+    </dependency>
 
     <!-- Security + OAuth2 Client -->
     <dependency>

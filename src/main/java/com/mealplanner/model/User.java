@@ -37,6 +37,10 @@ public class User {
     // Tracks activity used in admin views
     private LocalDateTime lastActiveAt;
 
+    // Target weight for the progress page. The client sets it; the coach can change it.
+    @Column(name = "goal_weight_lbs")
+    private Double goalWeightLbs;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SavedMealPlan> savedMealPlans = new ArrayList<>();
 
@@ -76,4 +80,7 @@ public class User {
 
     public LocalDateTime getLastActiveAt() { return lastActiveAt; }
     public void setLastActiveAt(LocalDateTime lastActiveAt) { this.lastActiveAt = lastActiveAt; }
+
+    public Double getGoalWeightLbs() { return goalWeightLbs; }
+    public void setGoalWeightLbs(Double goalWeightLbs) { this.goalWeightLbs = goalWeightLbs; }
 }

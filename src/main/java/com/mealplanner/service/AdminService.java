@@ -24,6 +24,8 @@ public class AdminService {
     private final com.mealplanner.repository.UserFoodPreferencesRepository userFoodPreferencesRepository;
     private final com.mealplanner.repository.AiUsageRepository aiUsageRepository;
     private final com.mealplanner.repository.AiCallLogRepository aiCallLogRepository;
+    private final ProgressService progressService;
+    private final com.mealplanner.repository.BodyCheckInRepository checkInRepository;
 
     public AdminService(UserRepository userRepository,
                         SavedMealPlanRepository savedMealPlanRepository,
@@ -32,7 +34,11 @@ public class AdminService {
                         com.mealplanner.repository.LearnedUserPreferenceRepository learnedUserPreferenceRepository,
                         com.mealplanner.repository.UserFoodPreferencesRepository userFoodPreferencesRepository,
                         com.mealplanner.repository.AiUsageRepository aiUsageRepository,
-                        com.mealplanner.repository.AiCallLogRepository aiCallLogRepository) {
+                        com.mealplanner.repository.AiCallLogRepository aiCallLogRepository,
+                        ProgressService progressService,
+                        com.mealplanner.repository.BodyCheckInRepository checkInRepository) {
+        this.progressService = progressService;
+        this.checkInRepository = checkInRepository;
         this.aiCallLogRepository = aiCallLogRepository;
         this.swapHistoryRepository = swapHistoryRepository;
         this.learnedUserPreferenceRepository = learnedUserPreferenceRepository;
@@ -81,6 +87,13 @@ public class AdminService {
         try { mealPlansThisWeek = savedMealPlanRepository.countByCreatedAtAfter(weekAgo); } catch (Exception ignore) {}
         stats.put("mealPlansThisWeek", mealPlansThisWeek);
 
+        // Clients (not admins or the shared demo) with no check-in in the last 7 days.
+        long missedCheckIns = userRepository.findAll().stream()
+                .filter(u -> !u.isAdmin() && !DemoAccountService.DEMO_EMAIL.equalsIgnoreCase(u.getEmail()))
+                .filter(progressService::missedCheckIn)
+                .count();
+        stats.put("missedCheckIns", missedCheckIns);
+
         return stats;
     }
 
@@ -97,6 +110,8 @@ public class AdminService {
             FoodLog last = null;
             try { last = foodLogRepository.findTopByUserOrderByLogDateDesc(user); } catch (Exception ignore) {}
             stats.put("lastActive", last != null ? last.getLogDate() : null);
+            stats.put("lastCheckIn", progressService.lastCheckInDate(user));
+            stats.put("missedCheckIn", progressService.missedCheckIn(user));
 
             userStats.add(stats);
         }
@@ -185,6 +200,7 @@ public class AdminService {
         learnedUserPreferenceRepository.deleteAll(learnedUserPreferenceRepository.findByUserOrderByConfidenceScoreDesc(user));
         userFoodPreferencesRepository.findByUser(user).ifPresent(userFoodPreferencesRepository::delete);
         aiUsageRepository.deleteAll(aiUsageRepository.findByUser(user));
+        checkInRepository.deleteAll(checkInRepository.findByUserOrderByCheckInDateAsc(user));
         // Spend history is kept for the books, but no longer points at the person.
         aiCallLogRepository.detachUser(user);
         // Saved meal plans go with the user (orphanRemoval on User.savedMealPlans).

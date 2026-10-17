@@ -15,6 +15,7 @@
 <div th:replace="~{fragments/navbar :: authenticated-navbar}"></div>
 <div th:if="${impersonating}" class="alert alert-warning text-center mb-0 rounded-0">Viewing <strong th:text="${user.name}">client</strong> (read-only). <a href="/admin/exit-impersonation">Exit client view</a></div>
 <div th:if="${error}" class="alert alert-danger text-center mb-0 rounded-0" th:text="${error}">error</div>
+<div th:if="${checkInDue}" class="alert alert-info text-center mb-0 rounded-0"><i class="bi bi-graph-up-arrow"></i> Time for a check-in. <a href="/progress">Log your weight</a> to keep your progress chart up to date.</div>
 
 <div class="container my-5">
     <div class="row mb-4">

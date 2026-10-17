@@ -19,26 +19,6 @@
   text-shadow: 0 0 6px rgba(45, 212, 255, 0.6);
 }
 
-/* Stat tiles */
-.stat-tile .stat-label {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  color: var(--muted);
-}
-.stat-tile .stat-value {
-  font-family: 'Orbitron', 'Audiowide', system-ui, sans-serif;
-  font-size: 1.8rem;
-  color: var(--text);
-  line-height: 1.2;
-  margin-top: 4px;
-}
-.stat-tile .stat-sub {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-top: 2px;
-}
-
 /* Tables inside neon cards */
 .neon .card.neon .table { margin-bottom: 0; --bs-table-bg: transparent; }
 .neon .table td, .neon .table th { vertical-align: middle; }

@@ -23,8 +23,10 @@ public class DashboardController {
     private final FoodLogService foodLogService;
     private final UserFoodPreferencesService preferencesService;
     private final com.mealplanner.service.CurrentUserService currentUserService;
+    private final com.mealplanner.service.ProgressService progressService;
 
-    public DashboardController(UserRepository userRepository, SavedMealPlanRepository mealPlanRepository, FoodLogService foodLogService, UserFoodPreferencesService preferencesService, com.mealplanner.service.CurrentUserService currentUserService) {
+    public DashboardController(UserRepository userRepository, SavedMealPlanRepository mealPlanRepository, FoodLogService foodLogService, UserFoodPreferencesService preferencesService, com.mealplanner.service.CurrentUserService currentUserService, com.mealplanner.service.ProgressService progressService) {
+        this.progressService = progressService;
         this.currentUserService = currentUserService;
         this.userRepository = userRepository;
         this.mealPlanRepository = mealPlanRepository;
@@ -69,6 +71,7 @@ public class DashboardController {
         model.addAttribute("latestMealPlan", latestMealPlan);
         model.addAttribute("userPreferences", preferencesService.getUserPreferences(user));
         model.addAttribute("impersonating", viewingAs);
+        model.addAttribute("checkInDue", !viewingAs && !currentUserService.isDemo(user) && progressService.missedCheckIn(user));
         return "dashboard";
     }
 }

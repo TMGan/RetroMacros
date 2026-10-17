@@ -1,6 +1,7 @@
 package com.mealplanner.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mealplanner.model.BodyCheckIn;
 import com.mealplanner.model.FoodLog;
 import com.mealplanner.model.GroceryList;
 import com.mealplanner.model.MacroTargets;
@@ -45,6 +46,7 @@ public class DemoAccountService {
     private final SwapHistoryRepository swapHistoryRepository;
     private final LearnedUserPreferenceRepository learnedUserPreferenceRepository;
     private final UserFoodPreferencesRepository userFoodPreferencesRepository;
+    private final com.mealplanner.repository.BodyCheckInRepository bodyCheckInRepository;
     private final MealPlanService mealPlanService;
     private final MacroCalculatorService macroCalculatorService;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -55,6 +57,7 @@ public class DemoAccountService {
                               SwapHistoryRepository swapHistoryRepository,
                               LearnedUserPreferenceRepository learnedUserPreferenceRepository,
                               UserFoodPreferencesRepository userFoodPreferencesRepository,
+                              com.mealplanner.repository.BodyCheckInRepository bodyCheckInRepository,
                               MealPlanService mealPlanService,
                               MacroCalculatorService macroCalculatorService) {
         this.userRepository = userRepository;
@@ -63,6 +66,7 @@ public class DemoAccountService {
         this.swapHistoryRepository = swapHistoryRepository;
         this.learnedUserPreferenceRepository = learnedUserPreferenceRepository;
         this.userFoodPreferencesRepository = userFoodPreferencesRepository;
+        this.bodyCheckInRepository = bodyCheckInRepository;
         this.mealPlanService = mealPlanService;
         this.macroCalculatorService = macroCalculatorService;
     }
@@ -83,11 +87,15 @@ public class DemoAccountService {
         demo.setAdmin(false);
         demo.setLastLoginAt(LocalDateTime.now());
         demo.setLastActiveAt(LocalDateTime.now());
+        demo.setGoalWeightLbs(178.0);
         demo = userRepository.save(demo);
 
         wipe(demo);
+        // Run the deletes now. Hibernate otherwise inserts before deleting, which breaks the one-check-in-per-day rule.
+        bodyCheckInRepository.flush();
         seedFoodLogs(demo);
         seedMealPlan(demo);
+        seedCheckIns(demo);
         return demo;
     }
 
@@ -101,6 +109,7 @@ public class DemoAccountService {
         learnedUserPreferenceRepository.deleteAll(
                 learnedUserPreferenceRepository.findByUserOrderByConfidenceScoreDesc(demo));
         userFoodPreferencesRepository.findByUser(demo).ifPresent(userFoodPreferencesRepository::delete);
+        bodyCheckInRepository.deleteAll(bodyCheckInRepository.findByUserOrderByCheckInDateAsc(demo));
     }
 
     private void seedFoodLogs(User demo) {
@@ -129,6 +138,32 @@ public class DemoAccountService {
         entry.setFat(fat);
         entry.setFromMealPlan(false);
         foodLogRepository.save(entry);
+    }
+
+    /** Five weeks of believable check-ins so the demo's progress page has charts to show. */
+    private void seedCheckIns(User demo) {
+        LocalDate today = LocalDate.now();
+        // Weigh-ins roughly 4 times a week, trending down about 1.2 lb/week with normal day-to-day noise.
+        int[] daysAgo = {34, 32, 30, 28, 27, 25, 23, 21, 20, 18, 16, 14, 13, 11, 9, 7, 6, 4, 2, 0};
+        double[] noise = {0.6, -0.4, 0.9, -0.2, 0.3, -0.7, 0.5, 0.1, -0.5, 0.8, -0.3, 0.4, -0.6, 0.2, 0.7, -0.4, 0.3, -0.2, 0.5, -0.1};
+        for (int i = 0; i < daysAgo.length; i++) {
+            int d = daysAgo[i];
+            BodyCheckIn entry = new BodyCheckIn();
+            entry.setUser(demo);
+            entry.setCheckInDate(today.minusDays(d));
+            entry.setWeightLbs(Math.round((182.0 + d * 0.17 + noise[i]) * 10) / 10.0);
+            // Body fat, waist and how they feel on the weekly "full" check-ins.
+            if (d % 7 == 0 || d == 34) {
+                entry.setBodyFatPct(Math.round((20.0 + d * 0.053) * 10) / 10.0);
+                entry.setWaistIn(Math.round((35.1 + d * 0.04) * 10) / 10.0);
+                int week = (34 - d) / 7;
+                entry.setEnergy(Math.min(5, 2 + week / 2 + 1));
+                entry.setSleep(Math.min(5, 3 + week / 3));
+                entry.setHunger(Math.max(2, 4 - week / 2));
+                entry.setStress(Math.max(2, 4 - week / 3));
+            }
+            bodyCheckInRepository.save(entry);
+        }
     }
 
     private void seedMealPlan(User demo) {
