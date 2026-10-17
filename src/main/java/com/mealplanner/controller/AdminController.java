@@ -30,6 +30,7 @@ import java.util.stream.Collectors;
 public class AdminController {
 
     private final AdminService adminService;
+    private final com.mealplanner.service.ProgressService progressService;
     private final UserRepository userRepository;
     private final SavedMealPlanRepository savedMealPlanRepository;
     private final FoodLogRepository foodLogRepository;
@@ -41,7 +42,9 @@ public class AdminController {
                            SavedMealPlanRepository savedMealPlanRepository,
                            FoodLogRepository foodLogRepository,
                            AllowedEmailRepository allowedEmailRepository,
-                           AdminAuditLogRepository auditLogRepository) {
+                           AdminAuditLogRepository auditLogRepository,
+                           com.mealplanner.service.ProgressService progressService) {
+        this.progressService = progressService;
         this.allowedEmailRepository = allowedEmailRepository;
         this.auditLogRepository = auditLogRepository;
         this.adminService = adminService;
@@ -95,6 +98,8 @@ public class AdminController {
                 m.put("totalMealPlans", savedMealPlanRepository.countByUser(u));
                 FoodLog last = foodLogRepository.findTopByUserOrderByLogDateDesc(u);
                 m.put("lastActive", last != null ? last.getLogDate() : null);
+                m.put("lastCheckIn", progressService.lastCheckInDate(u));
+                m.put("missedCheckIn", progressService.missedCheckIn(u));
                 users.add(m);
             }
         } else {
@@ -123,7 +128,26 @@ public class AdminController {
         requireAdmin(principal);
         Map<String, Object> details = adminService.getUserDetails(userId);
         model.addAllAttributes(details);
+        User client = (User) details.get("user");
+        model.addAttribute("summary", progressService.summary(client));
+        model.addAttribute("chartJson", ProgressController.chartJson(progressService.chartData(client), new com.fasterxml.jackson.databind.ObjectMapper()));
+        model.addAttribute("recentCheckIns", progressService.recentCheckIns(client, 5));
         return "admin/user-details";
+    }
+
+    @PostMapping("/users/{userId}/goal")
+    public String setClientGoal(@AuthenticationPrincipal OAuth2User principal,
+                                @PathVariable Long userId,
+                                @RequestParam(required = false) Double goalWeight) {
+        requireAdmin(principal);
+        User client = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (goalWeight != null && (goalWeight.isNaN() || goalWeight < 70 || goalWeight > 700)) {
+            return "redirect:/admin/users/" + userId + "?goalInvalid=true";
+        }
+        client.setGoalWeightLbs(goalWeight == null ? null : Math.round(goalWeight * 10) / 10.0);
+        userRepository.save(client);
+        auditLogRepository.save(new AdminAuditLog(getCurrentUser(principal).getEmail(), "SET_GOAL", "user:" + userId));
+        return "redirect:/admin/users/" + userId + "?goalSaved=true";
     }
 
     @PostMapping("/users/{userId}/delete")

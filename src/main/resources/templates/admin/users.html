@@ -35,7 +35,7 @@
         <div class="card-body">
             <div class="table-responsive" th:if="${!#lists.isEmpty(users)}">
                 <table class="table table-dark table-hover">
-                    <thead><tr><th>Name</th><th>Email</th><th>Signed up</th><th>Last logged food</th><th>Food logs</th><th>Plans</th><th></th></tr></thead>
+                    <thead><tr><th>Name</th><th>Email</th><th>Signed up</th><th>Last check-in</th><th>Last logged food</th><th>Food logs</th><th>Plans</th><th></th></tr></thead>
                     <tbody>
                     <tr th:each="userStat : ${users}" th:with="u=${userStat.user}" th:attr="data-href=@{/admin/users/{id}(id=${u.id})}">
                         <td>
@@ -44,6 +44,10 @@
                         </td>
                         <td th:text="${u.email}">email</td>
                         <td th:text="${u.createdAt != null ? #temporals.format(u.createdAt, 'MMM d, yyyy') : ''}">date</td>
+                        <td>
+                            <span th:if="${userStat.lastCheckIn != null}" th:text="${#temporals.format(userStat.lastCheckIn, 'MMM d')}">date</span>
+                            <span th:if="${userStat.missedCheckIn and !u.admin}" class="badge text-bg-warning ms-1">Missed</span>
+                        </td>
                         <td>
                             <span th:if="${userStat.lastActive != null}" th:text="${#temporals.format(userStat.lastActive, 'MMM d, yyyy')}">date</span>
                             <span th:unless="${userStat.lastActive != null}" class="badge text-bg-warning">Never</span>

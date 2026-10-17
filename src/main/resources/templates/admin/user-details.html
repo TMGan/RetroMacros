@@ -56,6 +56,55 @@
         </div>
     </div>
 
+    <!-- Progress -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h4 class="section-title mb-0">Progress</h4>
+        <span th:if="${summary.missedCheckIn}" class="badge text-bg-warning">No check-in in 7 days</span>
+    </div>
+    <div th:if="${param.goalSaved}" class="alert alert-success">Goal weight saved.</div>
+    <div th:if="${param.goalInvalid}" class="alert alert-danger">Goal weight must be between 70 and 700 lb.</div>
+    <div th:unless="${summary.hasData}" class="card neon mb-4"><div class="card-body empty-state">No check-ins yet.</div></div>
+    <th:block th:replace="~{fragments/progress :: stats(${summary})}"></th:block>
+    <th:block th:if="${summary.hasData}"><th:block th:replace="~{fragments/progress :: charts(${chartJson})}"></th:block></th:block>
+    <th:block th:replace="~{fragments/progress :: details(${summary})}"></th:block>
+
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-lg-8">
+            <div class="card neon h-100"><div class="card-body">
+                <h5 class="mb-3">Recent check-ins</h5>
+                <div class="table-responsive" th:if="${!#lists.isEmpty(recentCheckIns)}">
+                    <table class="table table-dark">
+                        <thead><tr><th>Date</th><th>Weight</th><th>BF %</th><th>Energy</th><th>Sleep</th><th>Hunger</th><th>Stress</th><th>Note</th></tr></thead>
+                        <tbody>
+                        <tr th:each="c : ${recentCheckIns}">
+                            <td class="text-nowrap" th:text="${#temporals.format(c.checkInDate, 'MMM d')}">date</td>
+                            <td th:text="${c.weightLbs}">0</td>
+                            <td th:text="${c.bodyFatPct}"></td>
+                            <td th:text="${c.energy}"></td>
+                            <td th:text="${c.sleep}"></td>
+                            <td th:text="${c.hunger}"></td>
+                            <td th:text="${c.stress}"></td>
+                            <td th:text="${c.note}"></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <div th:if="${#lists.isEmpty(recentCheckIns)}" class="empty-state">No check-ins yet.</div>
+            </div></div>
+        </div>
+        <div class="col-12 col-lg-4">
+            <div class="card neon h-100"><div class="card-body">
+                <h5 class="mb-1">Goal weight</h5>
+                <p class="text-muted small mb-3">The client can set this too. Leave blank to clear.</p>
+                <form th:action="@{/admin/users/{id}/goal(id=${user.id})}" method="post" class="d-flex gap-2">
+                    <input class="form-control" type="number" name="goalWeight" step="0.1" min="70" max="700" th:value="${user.goalWeightLbs}" placeholder="lb">
+                    <button type="submit" class="btn btn-outline-neon">Save</button>
+                </form>
+            </div></div>
+        </div>
+    </div>
+
+    <h4 class="section-title mb-3">Plans and food log</h4>
     <div class="card neon mb-4">
         <div class="card-body">
             <h5 class="mb-3">Meal plans</h5>
@@ -105,6 +154,8 @@
     </div>
 </div>
 
+<script th:src="@{/webjars/chart.js/dist/chart.umd.min.js}"></script>
+<script th:src="@{/js/progress-charts.js}"></script>
 <th:block th:replace="~{fragments/admin :: scripts}"></th:block>
 </body>
 </html>

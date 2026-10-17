@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Progress - Retro Macros</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Audiowide&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/theme.css}" />
+</head>
+<body class="neon">
+<div th:replace="~{fragments/navbar :: authenticated-navbar}"></div>
+<div th:if="${impersonating}" class="alert alert-warning text-center mb-0 rounded-0">Viewing <strong th:text="${user.name}">client</strong> (read-only). <a href="/admin/exit-impersonation">Exit client view</a></div>
+
+<div class="container py-4">
+    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <h2 class="section-title mb-0">Your progress</h2>
+        <span class="text-muted" th:if="${summary.hasData}" th:text="'Week ' + ${summary.weeksIn} + ' · last check-in ' + ${#temporals.format(summary.latestDate, 'MMM d')}"></span>
+    </div>
+
+    <div th:if="${success}" class="alert alert-success" th:text="${success}">Saved</div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}">Error</div>
+    <div th:if="${summary.hasData && summary.missedCheckIn}" class="alert alert-warning">
+        No check-in in the last 7 days. A quick weigh-in keeps your trend line honest.
+    </div>
+
+    <!-- Check-in form -->
+    <div class="card neon mb-4">
+        <div class="card-body">
+            <details class="checkin-panel" th:attr="open=${todayEntry == null} ? 'open' : null">
+            <summary class="h5 mb-1 d-flex align-items-center gap-2">
+                <span th:if="${todayEntry == null}">Check in</span>
+                <span th:if="${todayEntry != null}"><i class="bi bi-check-circle-fill text-success"></i> Checked in today <span class="text-muted fs-6" th:text="${todayEntry.weightLbs} + ' lb · tap to edit'"></span></span>
+            </summary>
+            <p class="text-muted small mb-3 mt-2">Weigh in as often as you like, ideally first thing in the morning. Only weight is required.</p>
+            <form th:action="@{/progress/check-in}" method="post">
+                <div class="row g-3">
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="weight">Weight (lb)</label>
+                        <input class="form-control" type="number" id="weight" name="weight" step="0.1" min="70" max="700" required
+                               th:value="${todayEntry?.weightLbs}">
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <label class="form-label" for="bodyFat">Body fat % <span class="text-muted">(optional)</span></label>
+                        <input class="form-control" type="number" id="bodyFat" name="bodyFat" step="0.1" min="3" max="70"
+                               th:value="${todayEntry?.bodyFatPct}">
+                    </div>
+                    <div class="col-12 col-md-3">
+                        <label class="form-label" for="date">Date</label>
+                        <input class="form-control" type="date" id="date" name="date"
+                               th:value="${today}" th:max="${today}" th:min="${earliestDate}">
+                    </div>
+                </div>
+
+                <details class="mt-3" th:attr="open=${todayEntry?.waistIn != null} ? 'open' : null">
+                    <summary class="text-muted">Measurements (inches, optional)</summary>
+                    <div class="row g-3 mt-1">
+                        <div class="col-4 col-md-2"><label class="form-label" for="waist">Waist</label>
+                            <input class="form-control" type="number" id="waist" name="waist" step="0.1" min="10" max="90" th:value="${todayEntry?.waistIn}"></div>
+                        <div class="col-4 col-md-2"><label class="form-label" for="hips">Hips</label>
+                            <input class="form-control" type="number" id="hips" name="hips" step="0.1" min="10" max="90" th:value="${todayEntry?.hipsIn}"></div>
+                        <div class="col-4 col-md-2"><label class="form-label" for="chest">Chest</label>
+                            <input class="form-control" type="number" id="chest" name="chest" step="0.1" min="10" max="90" th:value="${todayEntry?.chestIn}"></div>
+                        <div class="col-4 col-md-2"><label class="form-label" for="arm">Arm</label>
+                            <input class="form-control" type="number" id="arm" name="arm" step="0.1" min="4" max="40" th:value="${todayEntry?.armIn}"></div>
+                        <div class="col-4 col-md-2"><label class="form-label" for="thigh">Thigh</label>
+                            <input class="form-control" type="number" id="thigh" name="thigh" step="0.1" min="6" max="60" th:value="${todayEntry?.thighIn}"></div>
+                    </div>
+                </details>
+
+                <details class="mt-3" open>
+                    <summary class="text-muted">How are you feeling? (optional)</summary>
+                    <div class="row g-3 mt-1">
+                        <div class="col-12 col-md-6" th:each="score : ${ {'energy','sleep','hunger','stress'} }">
+                            <div class="form-label text-capitalize" th:text="${score} + (${score == 'hunger' or score == 'stress'} ? ' (1 low, 5 high)' : ' (1 poor, 5 great)')">Energy</div>
+                            <div class="btn-group w-100" role="group" th:attr="aria-label=${score}">
+                                <th:block th:each="n : ${#numbers.sequence(1, 5)}">
+                                    <input type="radio" class="btn-check" th:name="${score}" th:id="${score + n}" th:value="${n}"
+                                           th:checked="${todayEntry != null and todayEntry[score] == n}">
+                                    <label class="btn btn-outline-neon" th:for="${score + n}" th:text="${n}">1</label>
+                                </th:block>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label" for="note">Note for your coach</label>
+                            <textarea class="form-control" id="note" name="note" rows="2" maxlength="500"
+                                      placeholder="Anything worth knowing this week" th:text="${todayEntry?.note}"></textarea>
+                        </div>
+                    </div>
+                </details>
+
+                <button type="submit" class="btn btn-neon mt-3"><i class="bi bi-check2-circle"></i> Save check-in</button>
+            </form>
+            </details>
+        </div>
+    </div>
+
+    <div th:unless="${summary.hasData}" class="card neon mb-4">
+        <div class="card-body text-center text-muted py-4">Your charts appear after your first check-in.</div>
+    </div>
+
+    <th:block th:replace="~{fragments/progress :: stats(${summary})}"></th:block>
+    <th:block th:if="${summary.hasData}"><th:block th:replace="~{fragments/progress :: charts(${chartJson})}"></th:block></th:block>
+    <th:block th:replace="~{fragments/progress :: recap(${summary})}"></th:block>
+    <th:block th:replace="~{fragments/progress :: details(${summary})}"></th:block>
+
+    <!-- Goal weight -->
+    <div class="card neon mb-4">
+        <div class="card-body">
+            <h5 class="mb-1">Goal weight</h5>
+            <p class="text-muted small mb-3">Adds a goal line to your chart and an estimated date. Your coach can adjust it too.</p>
+            <form th:action="@{/progress/goal}" method="post" class="row g-2">
+                <div class="col-8 col-md-3">
+                    <input class="form-control" type="number" name="goalWeight" step="0.1" min="70" max="700" placeholder="e.g. 175"
+                           th:value="${user.goalWeightLbs}">
+                </div>
+                <div class="col-4 col-md-2 d-grid">
+                    <button type="submit" class="btn btn-outline-neon">Save goal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/webjars/chart.js/dist/chart.umd.min.js}"></script>
+<script th:src="@{/js/progress-charts.js}"></script>
+</body>
+</html>
