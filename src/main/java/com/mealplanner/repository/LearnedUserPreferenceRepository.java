@@ -15,5 +15,8 @@ public interface LearnedUserPreferenceRepository extends JpaRepository<LearnedUs
     Optional<LearnedUserPreference> findByUserAndPreferenceTypeAndFoodItemAndComparedToFood(
             User user, String preferenceType, String foodItem, String comparedToFood);
     List<LearnedUserPreference> findByUserAndConfidenceScoreGreaterThanEqual(User user, BigDecimal threshold);
+
+    // Strongest first, capped, so a client with many recorded swaps cannot bloat every prompt.
+    List<LearnedUserPreference> findTop15ByUserAndConfidenceScoreGreaterThanEqualOrderByConfidenceScoreDescTimesObservedDesc(User user, BigDecimal threshold);
 }
 

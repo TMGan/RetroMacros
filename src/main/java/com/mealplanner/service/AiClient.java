@@ -66,7 +66,7 @@ public class AiClient {
                     @Value("${ai.timeout.ms:120000}") long timeoutMs,
                     @Value("${ai.model.plan:claude-sonnet-5-5}") String planModel,
                     @Value("${ai.model.log:claude-haiku-5-5}") String logModel,
-                    @Value("${ai.effort.plan:medium}") String planEffort,
+                    @Value("${ai.effort.plan:low}") String planEffort,
                     @Value("${ai.effort.log:low}") String logEffort) {
         this.aiCallLogRepository = aiCallLogRepository;
         this.env = env;

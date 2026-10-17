@@ -252,26 +252,56 @@ public class FoodLogService {
     }
 
     public Map<String, Object> generateRandomHealthyMeal(User user, int targetCalories, boolean offline) {
+        return generateRandomHealthyMeal(user, targetCalories, offline, List.of(), null);
+    }
+
+    /**
+     * @param allergies foods the client must never get, checked in code as well as in the prompt
+     * @param clientPreferences the client's saved and learned preferences, or null
+     */
+    public Map<String, Object> generateRandomHealthyMeal(User user, int targetCalories, boolean offline,
+                                                         List<String> allergies, String clientPreferences) {
         try {
             String mock = env.getProperty("ai.mock", "false");
             if (offline || "true".equalsIgnoreCase(mock)) {
-                return randomMealMock(targetCalories);
+                return randomMealMock(targetCalories, allergies);
             }
-            String aiResponse = aiClient.complete(user, AiClient.Kind.SUGGESTION, buildRandomMealPrompt(targetCalories));
-            return parseRandomMealText(aiResponse);
+            String prompt = buildRandomMealPrompt(targetCalories, allergies, clientPreferences);
+            Map<String, Object> meal = parseRandomMealText(aiClient.complete(user, AiClient.Kind.SUGGESTION, prompt));
+            if (meal != null && !mealViolations(meal, allergies).isEmpty()) {
+                // One retry with a fresh brief; never show an idea the client is allergic to.
+                prompt = buildRandomMealPrompt(targetCalories, allergies, clientPreferences);
+                meal = parseRandomMealText(aiClient.complete(user, AiClient.Kind.SUGGESTION, prompt));
+                if (meal != null && !mealViolations(meal, allergies).isEmpty()) return null;
+            }
+            return meal;
         } catch (Exception e) {
             System.err.println("Error generating random meal: " + e.getMessage());
             return null;
         }
     }
 
-    private String buildRandomMealPrompt(int targetCalories) {
-        // The model tends to repeat itself on an identical prompt, so vary the brief.
-        String protein = SUGGESTION_PROTEINS[RANDOM.nextInt(SUGGESTION_PROTEINS.length)];
+    @SuppressWarnings("unchecked")
+    private java.util.Set<String> mealViolations(Map<String, Object> meal, List<String> allergies) {
+        return AllergenGuard.violations(allergies, (String) meal.get("description"), (List<String>) meal.get("ingredients"));
+    }
+
+    private String buildRandomMealPrompt(int targetCalories, List<String> allergies, String clientPreferences) {
+        // The model tends to repeat itself on an identical prompt, so vary the brief,
+        // but never build it around a protein the client can't eat.
+        List<String> proteins = java.util.Arrays.stream(SUGGESTION_PROTEINS)
+                .filter(p -> AllergenGuard.violations(allergies, p, List.of()).isEmpty())
+                .toList();
+        String protein = proteins.isEmpty() ? "a protein the client can eat" : proteins.get(RANDOM.nextInt(proteins.size()));
         String style = SUGGESTION_STYLES[RANDOM.nextInt(SUGGESTION_STYLES.length)];
+        String rules = (allergies == null || allergies.isEmpty()) ? ""
+                : "The client must not eat: " + String.join(", ", allergies) + ". Leave these out of every ingredient, sauce and garnish.\n";
+        String preferences = (clientPreferences == null || clientPreferences.isBlank()) ? "" : clientPreferences.trim() + "\n";
         return String.format(
                 "Suggest one healthy, balanced meal of about %d calories that a home cook can make in under 30 minutes.\n" +
-                "Build it around %s, in the style of a %s. Common grocery-store ingredients only.\n\n" +
+                "Build it around %s, in the style of a %s. Common grocery-store ingredients only.\n" +
+                // Client text can contain "%", which String.format would read as a placeholder.
+                (rules + preferences).replace("%", "%%") + "\n" +
                 "Respond with ONLY a JSON object. No prose, no code fences. Use exactly these keys:\n" +
                 "{\"name\": string, \"ingredients\": [string], \"steps\": [string], " +
                 "\"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number}\n\n" +
@@ -337,7 +367,7 @@ public class FoodLogService {
 
     // Built-in ideas used when AI is off (demo account, ai.mock=true). Picks from the
     // ones closest to the calorie target so repeated clicks still vary.
-    private Map<String, Object> randomMealMock(int targetCalories) {
+    private Map<String, Object> randomMealMock(int targetCalories, List<String> allergies) {
         List<Map<String, Object>> options = new java.util.ArrayList<>(List.of(
                 meal("Chicken and Rice Bowl",
                         List.of("6 oz chicken breast", "1 cup cooked white rice", "1 cup broccoli florets", "1 tsp olive oil", "1 tbsp soy sauce", "Salt, pepper, garlic powder"),
@@ -386,8 +416,9 @@ public class FoodLogService {
                                 "Fold in the sides and roll up. Eat with the apple."),
                         420, 38, 50, 7)
         ));
+        options.removeIf(m -> !mealViolations(m, allergies).isEmpty());
         options.sort(java.util.Comparator.comparingInt(
                 (Map<String, Object> m) -> Math.abs((Integer) m.get("calories") - targetCalories)));
-        return options.get(RANDOM.nextInt(4));
+        return options.isEmpty() ? null : options.get(RANDOM.nextInt(Math.min(4, options.size())));
     }
 }

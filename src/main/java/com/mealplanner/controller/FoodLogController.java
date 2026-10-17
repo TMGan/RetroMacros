@@ -1,6 +1,7 @@
 package com.mealplanner.controller;
 
 import com.mealplanner.model.FoodLog;
+import com.mealplanner.model.SavedMealPlan;
 import com.mealplanner.model.User;
 import com.mealplanner.repository.UserRepository;
 import com.mealplanner.service.AiQuotaService;
@@ -36,10 +37,20 @@ public class FoodLogController {
     private final CurrentUserService currentUserService;
     private final AiQuotaService aiQuotaService;
 
+    private final com.mealplanner.repository.SavedMealPlanRepository savedMealPlanRepository;
+    private final com.mealplanner.service.UserFoodPreferencesService preferencesService;
+    private final com.mealplanner.service.SwapService swapService;
+
     public FoodLogController(FoodLogService foodLogService,
                              UserRepository userRepository,
                              CurrentUserService currentUserService,
-                             AiQuotaService aiQuotaService) {
+                             AiQuotaService aiQuotaService,
+                             com.mealplanner.repository.SavedMealPlanRepository savedMealPlanRepository,
+                             com.mealplanner.service.UserFoodPreferencesService preferencesService,
+                             com.mealplanner.service.SwapService swapService) {
+        this.savedMealPlanRepository = savedMealPlanRepository;
+        this.preferencesService = preferencesService;
+        this.swapService = swapService;
         this.foodLogService = foodLogService;
         this.userRepository = userRepository;
         this.currentUserService = currentUserService;
@@ -111,6 +122,12 @@ public class FoodLogController {
                 userRepository.save(user);
             } catch (Exception ignore) {}
         }
+        // Caps writes for every account, including the public demo, so nobody can fill the database.
+        try {
+            aiQuotaService.consume(user, AiQuotaService.Kind.FOOD_LOG);
+        } catch (AiQuotaService.QuotaExceededException e) {
+            return e.getMessage();
+        }
         ZoneId zone = foodLogService.zoneFor(user);
 
         FoodLog foodLog = new FoodLog();
@@ -156,7 +173,11 @@ public class FoodLogController {
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
             if (targetCalories == null) targetCalories = 500;
             targetCalories = Math.max(100, Math.min(2000, targetCalories));
-            Map<String, Object> suggestion = foodLogService.generateRandomHealthyMeal(user, targetCalories, offline);
+            // Same allergies (from the latest plan) and preferences the meal plans follow.
+            List<SavedMealPlan> latest = savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user);
+            List<String> allergies = latest.isEmpty() ? List.of() : latest.get(0).getAllergyList();
+            String preferences = preferencesService.buildPreferencesPrompt(user) + "\n" + swapService.buildLearnedPreferencesPrompt(user);
+            Map<String, Object> suggestion = foodLogService.generateRandomHealthyMeal(user, targetCalories, offline, allergies, preferences);
             if (suggestion == null) {
                 response.put("success", false);
                 response.put("error", "Could not generate suggestion.");
@@ -192,6 +213,12 @@ public class FoodLogController {
         User user = currentUserService.require(principal);
         Map<String, Object> response = new HashMap<>();
         try {
+            // Check the input before charging it against the daily AI limit.
+            if (!isUsableDescription(foodDescription)) {
+                response.put("success", false);
+                response.put("error", "Please enter a valid food description.");
+                return ResponseEntity.ok(response);
+            }
             boolean offline = currentUserService.isDemo(user);
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
             Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(user, foodDescription, offline);
@@ -250,6 +277,12 @@ public class FoodLogController {
         User user = currentUserService.require(principal);
         Map<String, Object> response = new HashMap<>();
         try {
+            // Check the input before charging it against the daily AI limit.
+            if (!isUsableDescription(foodDescription)) {
+                response.put("success", false);
+                response.put("error", "Please enter a valid food description.");
+                return ResponseEntity.ok(response);
+            }
             boolean offline = currentUserService.isDemo(user);
             if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
             Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(user, foodDescription, offline);
@@ -271,6 +304,11 @@ public class FoodLogController {
             response.put("error", "Couldn't estimate macros. Please enter them manually.");
             return ResponseEntity.status(500).body(response);
         }
+    }
+
+    private boolean isUsableDescription(String description) {
+        String d = description == null ? "" : description.trim();
+        return d.length() >= 3 && d.length() <= MAX_DESCRIPTION_LENGTH;
     }
 
     private ResponseEntity<Map<String, Object>> quotaResponse(AiQuotaService.QuotaExceededException e) {

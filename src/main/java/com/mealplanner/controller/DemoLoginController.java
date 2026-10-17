@@ -61,6 +61,10 @@ public class DemoLoginController {
         OAuth2AuthenticationToken authentication =
                 new OAuth2AuthenticationToken(principal, principal.getAuthorities(), "google");
 
+        // New session ID on sign-in, so an ID set before login can never be reused after it.
+        request.getSession(true);
+        request.changeSessionId();
+
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);

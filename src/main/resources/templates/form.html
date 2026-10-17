@@ -46,7 +46,7 @@
 
             <div class="col-md-2">
                 <label for="age" class="form-label">Age</label>
-                <input type="number" class="form-control" id="age" name="age" placeholder="e.g., 30" min="13" max="100" required th:value="${param.age}">
+                <input type="number" class="form-control" id="age" name="age" placeholder="e.g., 30" min="18" max="100" required th:value="${param.age}">
                 <div class="invalid-feedback">Please enter a valid age (13-100).</div>
             </div>
 
@@ -198,20 +198,22 @@
         Array.prototype.slice.call(forms)
             .forEach(function (form) {
                 form.addEventListener('submit', function (event) {
+                    form.classList.add('was-validated')
                     if (!form.checkValidity()) {
                         event.preventDefault()
                         event.stopPropagation()
+                        return  // leave the button usable so they can fix the form and resubmit
                     }
                     const btn = document.getElementById('submitBtn')
                     if (btn) {
                         const spin = btn.querySelector('.spinner-border')
                         if (spin) spin.classList.remove('d-none')
+                        btn.lastElementChild.textContent = 'Building your plan, this takes about a minute...'
                         btn.setAttribute('disabled', 'true')
                     }
-                    form.classList.add('was-validated')
                 }, false)
             })
-    })()
+    })();  // this semicolon matters: without it the next block is parsed as a call and never runs
 
     // Show/hide body fat field based on formula selection
     (function() {

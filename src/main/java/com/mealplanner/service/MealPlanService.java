@@ -15,6 +15,15 @@ import java.util.regex.Pattern;
 @Service
 public class MealPlanService {
 
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MealPlanService.class);
+
+    // The JSON shape every plan must come back in. Kept as plain JSON so the model copies it cleanly.
+    private static final String MEAL_SCHEMA = """
+            {"name": string, "foods": [{"item": string, "portion": string}], \
+            "macros": {"calories": number, "protein": number, "carbs": number, "fat": number}, \
+            "recipe": {"name": string, "ingredients": [string], "instructions": [string], \
+            "prepTime": string, "cookTime": string, "totalTime": string}}""";
+
     private final AiClient aiClient;
     private final ObjectMapper mapper;
     private final boolean mockMode;
@@ -41,10 +50,28 @@ public class MealPlanService {
     /** @param user who the plan is for; AI usage and cost are recorded against them */
     public MealPlan generateMealPlan(User user, UserProfile profile, MacroTargets targets, String extraPrompt) throws RuntimeException {
         if (mockMode) {
-            return generateMockMealPlan(profile, targets);
+            return checkedSamplePlan(profile, targets);
         }
-        String base = buildPromptV2(profile, targets);
-        String prompt = (extraPrompt != null && !extraPrompt.isBlank()) ? (base + "\n\n" + extraPrompt) : base;
+        List<String> allergies = profile.getAllergies();
+        String prompt = buildPlanPrompt(profile, targets, extraPrompt);
+        MealPlan plan = requestPlan(user, prompt, targets);
+
+        // Allergy safety is checked in code, not left to the prompt. One retry, then refuse.
+        Set<String> violations = AllergenGuard.violations(allergies, plan);
+        if (!violations.isEmpty()) {
+            log.warn("Plan for user {} contained allergens {}; regenerating", user == null ? null : user.getId(), violations);
+            plan = requestPlan(user, prompt + "\n\nIMPORTANT: A previous attempt used " + String.join(", ", violations)
+                    + ", which this client must not eat. Use none of it in any form.", targets);
+            violations = AllergenGuard.violations(allergies, plan);
+            if (!violations.isEmpty()) {
+                throw new AiClient.AiException("We couldn't build a plan that avoids " + String.join(", ", violations)
+                        + ". Please try again.", null);
+            }
+        }
+        return plan;
+    }
+
+    private MealPlan requestPlan(User user, String prompt, MacroTargets targets) {
         String raw = aiClient.complete(user, AiClient.Kind.PLAN, prompt);
         try {
             String json = sanitizeToJson(raw);
@@ -67,7 +94,18 @@ public class MealPlanService {
 
     /** Built-in offline plan. Never calls the paid API, whatever ai.mock is set to. */
     public MealPlan generateSampleMealPlan(UserProfile profile, MacroTargets targets) {
-        return generateMockMealPlan(profile, targets);
+        return checkedSamplePlan(profile, targets);
+    }
+
+    // The sample menu is fixed and can't work around allergies, so refuse rather than serve one that conflicts.
+    private MealPlan checkedSamplePlan(UserProfile profile, MacroTargets targets) {
+        MealPlan plan = generateMockMealPlan(profile, targets);
+        Set<String> violations = AllergenGuard.violations(profile.getAllergies(), plan);
+        if (!violations.isEmpty()) {
+            throw new AiClient.AiException("The sample plan contains " + String.join(", ", violations)
+                    + ", so it can't be shown with your allergies. Personalized plans that avoid them are coming soon.", null);
+        }
+        return plan;
     }
 
     public GroceryList generateGroceryList(MealPlan plan) {
@@ -144,84 +182,100 @@ public class MealPlanService {
         }
     }
 
-    // New nutritionist-mode prompt with whole-food focus, tight macro accuracy, and variety constraints.
-    private String buildPromptV2(UserProfile profile, MacroTargets targets) {
-        String allergies = (profile.getAllergies() == null || profile.getAllergies().isEmpty())
-                ? "None" : String.join(", ", profile.getAllergies());
+    /**
+     * The meal plan prompt. Client rules come first and are stated as hard limits;
+     * variety is a goal, never a fixed menu, so it can't fight a client's diet.
+     *
+     * @param clientPreferences extra text from the client's saved and learned preferences, or null
+     */
+    String buildPlanPrompt(UserProfile profile, MacroTargets targets, String clientPreferences) {
+        List<String> allergies = profile.getAllergies() == null ? List.of() : profile.getAllergies();
+        StringBuilder p = new StringBuilder();
+        p.append("You are a sports nutritionist and practical home cook writing a 3-day meal plan for one coaching client.\n\n");
 
-        String persona = "You are a professional fitness nutritionist and chef with macro-tracking expertise.\n" +
-                "CRITICAL RULES FOR MACRO CALCULATIONS:\n" +
-                "1) Use USDA FoodData Central standards for whole foods.\n" +
-                "2) Be precise: round macros to the nearest 1g.\n" +
-                "3) Account for cooking method (raw vs cooked weights).\n" +
-                "4) Realistic portions: chicken breast 6-8oz cooked; fish 5-7oz; eggs 1 large = 70 cal/6g P/5g F; rice 1 cup cooked ~200 cal/45g C; sweet potato medium (5oz) ~110 cal/26g C.\n" +
-                "5) If numbers seem off, recalc before responding; prioritize accuracy.\n\n" +
-                "MEAL PHILOSOPHY:\n" +
-                "- Prioritize whole, minimally processed foods.\n" +
-                "- Keep meals exciting and flavorful; vary cooking techniques and ingredients.\n" +
-                "- Respect allergies and user preferences.\n\n" +
-                "VARIETY REQUIREMENTS (3 days):\n" +
-                "- No meal may repeat across all days.\n" +
-                "- Each day features a different primary protein:\n  * Day 1: Chicken or Turkey\n  * Day 2: Fish or Seafood\n  * Day 3: Beef or Pork or Eggs\n" +
-                "- Rotate breakfasts (e.g., eggs → oats → yogurt parfait).\n" +
-                "- Rotate vegetables and grains; vary cooking methods.\n\n" +
-                "OUTPUT: Return ONLY a valid JSON object (no prose, no code fences).";
+        p.append("HARD RULES (never break these):\n");
+        if (allergies.isEmpty()) {
+            p.append("- No allergies or restrictions were given.\n");
+        } else {
+            p.append("- The client must not eat: ").append(String.join(", ", allergies))
+             .append(". Leave these out of every meal, ingredient, sauce and garnish, including foods made from them ")
+             .append("(for example dairy includes milk, cheese, yogurt, butter, cream and whey; gluten includes bread, pasta and flour tortillas).\n");
+        }
+        p.append("- Each day must hit these targets: ").append(targets.getCalories()).append(" calories (within 50), ")
+         .append(targets.getProtein()).append("g protein (within 5g), ")
+         .append(targets.getCarbs()).append("g carbs (within 5g), ")
+         .append(targets.getFat()).append("g fat (within 3g).\n\n");
 
-        String user = "USER PROFILE:\n" +
-                "- Daily Calorie Target: " + targets.getCalories() + "\n" +
-                "- Daily Protein Target: " + targets.getProtein() + "g\n" +
-                "- Daily Carb Target: " + targets.getCarbs() + "g\n" +
-                "- Daily Fat Target: " + targets.getFat() + "g\n" +
-                "- Fitness Goal: " + profile.getFitnessGoal() + "\n" +
-                "- Allergies/Restrictions: " + allergies + "\n\n" +
-                "TARGET MACROS (strict per-day adherence):\n" +
-                "- Daily Calories: " + targets.getCalories() + " (match as closely as possible)\n" +
-                "- Daily Protein: " + targets.getProtein() + "g (±5g)\n" +
-                "- Daily Carbs: " + targets.getCarbs() + "g (±5g)\n" +
-                "- Daily Fat: " + targets.getFat() + "g (±3g)\n\n";
+        if (clientPreferences != null && !clientPreferences.isBlank()) {
+            p.append(clientPreferences.trim()).append("\n\n");
+        }
 
-        String schema = "SCHEMA (exact keys):\n" +
-                "{\\n  \"days\": [\\n    {\\n      \"day\": number,\\n      \"meals\": [\\n        {\\n          \"name\\\": string,\\n          \"foods\\\": [ { \\\"item\\\": string, \\\"portion\\\": string } ],\\n          \"macros\\\": { \\\"calories\\\": number, \\\"protein\\\": number, \\\"carbs\\\": number, \\\"fat\\\": number },\\n          \"recipe\\\": { \\\"name\\\": string, \\\"ingredients\\\": [string], \\\"instructions\\\": [string], \\\"prepTime\\\": string, \\\"cookTime\\\": string, \\\"totalTime\\\": string }\\n        }\\n      ],\\n      \"dailyTotals\\\": { \\\"calories\\\": number, \\\"protein\\\": number, \\\"carbs\\\": number, \\\"fat\\\": number }\\n    }\\n  ]\\n}";
+        p.append("FOOD CHOICES:\n")
+         .append("- Build meals mainly from the client's preferred foods when they gave any; otherwise use common foods from a normal grocery store.\n")
+         .append("- Favor whole, minimally processed foods. Convenient or packaged foods are fine when they fit the macros and the client's preferences.\n")
+         .append("- Vary the main protein, vegetables and grains across the three days so the days don't feel the same, ")
+         .append("but only with foods this client can eat. Repeating a breakfast or a meal-prep friendly lunch is fine.\n")
+         .append("- Fitness goal: ").append(profile.getFitnessGoal()).append(".\n\n");
 
-        String guide = "GENERATION INSTRUCTIONS:\n" +
-                "- Generate a complete 3-day plan. Each day: 3-4 meals + 1 snack.\n" +
-                "- Hit daily targets within ±50 calories; keep macro totals coherent.\n" +
-                "- Each meal must include a practical recipe with ingredients (quantities) and 3-5 clear steps.\n" +
-                "- Use whole ingredients; keep recipes flavorful and efficient; include prep/cook/total time.\n" +
-                "- Output strictly as JSON per schema.\n";
+        p.append("ACCURACY:\n")
+         .append("- Use USDA FoodData Central values, round macros to the nearest gram, and state cooked or raw weights.\n")
+         .append("- Use realistic portions, for example 6 to 8 oz cooked chicken breast, 1 cup cooked rice is about 200 calories and 45g carbs.\n")
+         .append("- Before answering, add up each day and adjust portions until the totals hit the targets.\n\n");
 
-        return persona + "\n\n" + user + schema + "\n\n" + guide;
+        p.append("FORMAT:\n")
+         .append("- 3 days. Each day has 3 or 4 meals plus 1 snack.\n")
+         .append("- Each meal has a practical recipe with ingredient quantities, 3 to 5 clear steps, and prep, cook and total time.\n")
+         .append("- Return ONLY a JSON object, no prose and no code fences, in exactly this shape:\n")
+         .append("{\"days\": [{\"day\": number, \"meals\": [").append(MEAL_SCHEMA).append("], ")
+         .append("\"dailyTotals\": {\"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number}}]}\n");
+        return p.toString();
     }
 
     // --- Single-meal generation for Swap ---
-    public Meal generateReplacementMeal(User user, MacroTargets target, String avoidSimilarTo) {
-        String avoid = (avoidSimilarTo == null || avoidSimilarTo.isBlank()) ? "" : ("Avoid making anything similar to: " + avoidSimilarTo + "\n");
-        String prompt = String.format("""
-                You are a professional fitness nutritionist and chef. Generate ONE different meal that fits these macros closely.
 
-                TARGET MACROS (± small tolerance):
-                - Calories: %d (±40)
-                - Protein: %dg (±5)
-                - Carbs: %dg (±8)
-                - Fat: %dg (±5)
+    /**
+     * One replacement meal for a swap. Gets the same allergy rules and preferences
+     * as the plan, and the same code-side allergy check.
+     */
+    public Meal generateReplacementMeal(User user, MacroTargets target, String avoidSimilarTo,
+                                        List<String> allergies, String clientPreferences) {
+        String prompt = buildSwapPrompt(target, avoidSimilarTo, allergies, clientPreferences);
+        Meal meal = parseSingleMeal(sanitizeToJson(aiClient.complete(user, AiClient.Kind.SWAP, prompt)));
 
-                RULES:
-                - Prioritize whole, minimally processed foods and exciting but practical flavors.
-                - Use realistic portions and account for cooked weights.
-                - Include a simple, practical recipe with quantities and 3-5 clear steps.
-                - %sReturn ONLY a valid JSON object matching this schema (no prose, no code fences):
-                {
-                  "name": string, // meal type or short label
-                  "foods": [ {"item": string, "portion": string} ],
-                  "macros": { "calories": number, "protein": number, "carbs": number, "fat": number },
-                  "recipe": { "name": string, "ingredients": [string], "instructions": [string], "prepTime": string, "cookTime": string, "totalTime": string }
-                }
-                """,
-                target.getCalories(), target.getProtein(), target.getCarbs(), target.getFat(), avoid);
+        Set<String> violations = AllergenGuard.violations(allergies, meal);
+        if (!violations.isEmpty()) {
+            log.warn("Swap for user {} contained allergens {}; regenerating", user == null ? null : user.getId(), violations);
+            meal = parseSingleMeal(sanitizeToJson(aiClient.complete(user, AiClient.Kind.SWAP, prompt
+                    + "\nIMPORTANT: A previous attempt used " + String.join(", ", violations) + ". Use none of it in any form.")));
+            if (!AllergenGuard.violations(allergies, meal).isEmpty()) {
+                throw new AiClient.AiException("We couldn't find a swap that avoids your allergies. Please try again.", null);
+            }
+        }
+        return meal;
+    }
 
-        String raw = aiClient.complete(user, AiClient.Kind.SWAP, prompt);
-        String json = sanitizeToJson(raw);
-        return parseSingleMeal(json);
+    String buildSwapPrompt(MacroTargets target, String avoidSimilarTo, List<String> allergies, String clientPreferences) {
+        StringBuilder p = new StringBuilder();
+        p.append("You are a sports nutritionist and practical home cook. Suggest ONE meal to replace a meal in a client's plan.\n\n");
+        p.append("HARD RULES (never break these):\n");
+        if (allergies != null && !allergies.isEmpty()) {
+            p.append("- The client must not eat: ").append(String.join(", ", allergies))
+             .append(". Leave these out of every ingredient, sauce and garnish, including foods made from them.\n");
+        }
+        p.append("- Hit these macros: ").append(target.getCalories()).append(" calories (within 40), ")
+         .append(target.getProtein()).append("g protein (within 5g), ")
+         .append(target.getCarbs()).append("g carbs (within 8g), ")
+         .append(target.getFat()).append("g fat (within 5g).\n");
+        if (avoidSimilarTo != null && !avoidSimilarTo.isBlank()) {
+            p.append("- Make it clearly different from: ").append(avoidSimilarTo).append(".\n");
+        }
+        p.append("\n");
+        if (clientPreferences != null && !clientPreferences.isBlank()) {
+            p.append(clientPreferences.trim()).append("\n\n");
+        }
+        p.append("Use realistic cooked portions and USDA FoodData Central values. Include a practical recipe with quantities and 3 to 5 steps.\n");
+        p.append("Return ONLY a JSON object, no prose and no code fences, in exactly this shape:\n").append(MEAL_SCHEMA).append("\n");
+        return p.toString();
     }
 
     private Meal parseSingleMeal(String json) {

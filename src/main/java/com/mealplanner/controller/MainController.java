@@ -91,6 +91,9 @@ public class MainController {
             Model model
     ) {
         List<String> errors = validateInputs(weight, heightFeet, heightInches, age, sex, activityLevel, fitnessGoal);
+        if (bodyFatPercentage != null && (bodyFatPercentage < 3 || bodyFatPercentage > 70)) {
+            errors.add("Body fat must be between 3% and 70%.");
+        }
         if (!errors.isEmpty()) {
             model.addAttribute("errors", errors);
             model.addAttribute("activityLevels", activityLevels());
@@ -100,7 +103,8 @@ public class MainController {
         }
 
         List<String> allAllergies = new ArrayList<>();
-        if (allergies != null) allAllergies.addAll(allergies);
+        // Only the known checkbox values; free text goes through the capped "other" box.
+        if (allergies != null) allergies.stream().filter(allergyOptions()::contains).distinct().forEach(allAllergies::add);
         if (StringUtils.hasText(otherAllergies)) {
             // Free text ends up in the AI prompt, so bound it.
             String bounded = otherAllergies.replaceAll("[\\r\\n\\t]+", " ");
@@ -139,6 +143,8 @@ public class MainController {
 
         User user = currentUserService.require(principal);
         try {
+            // Every plan is saved, so cap saves for every account, including the public demo.
+            aiQuotaService.consume(user, AiQuotaService.Kind.PLAN_SAVE);
             MealPlan mealPlan;
             if (currentUserService.isDemo(user)) {
                 // The shared demo account never spends API tokens.
@@ -147,7 +153,7 @@ public class MainController {
                 aiQuotaService.consume(user, AiQuotaService.Kind.PLAN);
                 String preferencesExtra = preferencesService.buildPreferencesPrompt(user);
                 String learnedExtra = swapService.buildLearnedPreferencesPrompt(user);
-                String combinedExtra = (preferencesExtra == null ? "" : preferencesExtra) + (learnedExtra == null ? "" : learnedExtra);
+                String combinedExtra = (preferencesExtra == null ? "" : preferencesExtra) + "\n" + (learnedExtra == null ? "" : learnedExtra);
                 if (!combinedExtra.isBlank()) {
                     mealPlan = mealPlanService.generateMealPlan(user, profile, targets, combinedExtra);
                 } else {
@@ -170,6 +176,7 @@ public class MainController {
             saved.setTargetProtein(targets.getProtein());
             saved.setTargetCarbs(targets.getCarbs());
             saved.setTargetFat(targets.getFat());
+            saved.setAllergies(String.join(", ", allAllergies));
             try {
                 // Optional: reflect selected formula in saved JSON metadata later if desired
                 // Not persisting formula fields to entity to keep migration simple
@@ -186,6 +193,14 @@ public class MainController {
             model.addAttribute("groceryList", groceryList);
             return "results"; // templates/results.html
         } catch (AiQuotaService.QuotaExceededException ex) {
+            model.addAttribute("errors", List.of(ex.getMessage()));
+            model.addAttribute("activityLevels", activityLevels());
+            model.addAttribute("goals", goals());
+            model.addAttribute("allergyOptions", allergyOptions());
+            return "form";
+        } catch (com.mealplanner.service.AiClient.AiException ex) {
+            // These messages are written to be shown to clients (allergy refusals, outages).
+            log.warn("Meal plan generation failed for user {}: {}", user.getId(), ex.getMessage());
             model.addAttribute("errors", List.of(ex.getMessage()));
             model.addAttribute("activityLevels", activityLevels());
             model.addAttribute("goals", goals());
@@ -208,7 +223,7 @@ public class MainController {
         if (weight < 50 || weight > 500) errs.add("Weight must be between 50 and 500 lbs.");
         if (feet < 3 || feet > 8) errs.add("Height feet must be between 3 and 8.");
         if (inches < 0 || inches > 11) errs.add("Height inches must be between 0 and 11.");
-        if (age < 13 || age > 100) errs.add("Age must be between 13 and 100.");
+        if (age < 18 || age > 100) errs.add("Age must be between 18 and 100.");
         if (!List.of("male", "female").contains(Optional.ofNullable(sex).orElse("").toLowerCase())) {
             errs.add("Sex must be Male or Female.");
         }

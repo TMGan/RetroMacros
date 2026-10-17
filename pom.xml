@@ -22,6 +22,14 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
     <bootstrap.version>5.3.3</bootstrap.version>
+    <!-- Security patches ahead of the Spring Boot defaults (OSV audit, Oct 2026).
+         Remove each once Spring Boot ships an equal or newer version. -->
+    <tomcat.version>10.1.61</tomcat.version>
+    <jackson-bom.version>2.21.7</jackson-bom.version>
+    <postgresql.version>42.7.12</postgresql.version>
+    <httpclient5.version>5.6.3</httpclient5.version>
+    <httpcore5.version>5.4.3</httpcore5.version>
+    <log4j2.version>2.25.5</log4j2.version>
   </properties>
 
   <dependencies>

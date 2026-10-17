@@ -6,6 +6,11 @@ import com.mealplanner.model.User;
 import com.mealplanner.service.AiQuotaService;
 import com.mealplanner.service.CurrentUserService;
 import com.mealplanner.service.MealPlanService;
+import com.mealplanner.model.SavedMealPlan;
+import com.mealplanner.repository.SavedMealPlanRepository;
+import com.mealplanner.service.SwapService;
+import com.mealplanner.service.UserFoodPreferencesService;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -26,9 +31,19 @@ public class MealApiController {
     private final CurrentUserService currentUserService;
     private final AiQuotaService aiQuotaService;
 
+    private final SavedMealPlanRepository savedMealPlanRepository;
+    private final UserFoodPreferencesService preferencesService;
+    private final SwapService swapService;
+
     public MealApiController(MealPlanService mealPlanService,
                              CurrentUserService currentUserService,
-                             AiQuotaService aiQuotaService) {
+                             AiQuotaService aiQuotaService,
+                             SavedMealPlanRepository savedMealPlanRepository,
+                             UserFoodPreferencesService preferencesService,
+                             SwapService swapService) {
+        this.savedMealPlanRepository = savedMealPlanRepository;
+        this.preferencesService = preferencesService;
+        this.swapService = swapService;
         this.mealPlanService = mealPlanService;
         this.currentUserService = currentUserService;
         this.aiQuotaService = aiQuotaService;
@@ -61,7 +76,11 @@ public class MealApiController {
                     req.targetCarbs,
                     req.targetFat
             );
-            Meal replacement = mealPlanService.generateReplacementMeal(user, target, cleanHint(req.avoidSimilarTo));
+            // Swaps follow the same allergies (from the client's latest plan) and preferences as the plan.
+            List<SavedMealPlan> latest = savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user);
+            List<String> allergies = latest.isEmpty() ? List.of() : latest.get(0).getAllergyList();
+            String preferences = preferencesService.buildPreferencesPrompt(user) + "\n" + swapService.buildLearnedPreferencesPrompt(user);
+            Meal replacement = mealPlanService.generateReplacementMeal(user, target, cleanHint(req.avoidSimilarTo), allergies, preferences);
             if (replacement == null) {
                 return ResponseEntity.status(502).body(Map.of("error", "Could not generate replacement meal"));
             }

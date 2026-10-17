@@ -53,11 +53,14 @@ public class UserFoodPreferencesService {
 
     public String buildPreferencesPrompt(User user) {
         UserFoodPreferences prefs = getUserPreferences(user);
-        if (prefs == null || (prefs.getPreferredFoodsText() == null || prefs.getPreferredFoodsText().isEmpty())) {
+        // Use whatever the client filled in. Previously everything was dropped
+        // unless "preferred foods" had text, including foods they want to avoid.
+        if (prefs == null || (isBlank(prefs.getPreferredFoodsText()) && isBlank(prefs.getAvoidedFoodsText())
+                && isBlank(prefs.getCookingPreference()) && isBlank(prefs.getDietaryStyle()))) {
             return "";
         }
         StringBuilder sb = new StringBuilder();
-        sb.append("\n\nUSER'S FOOD PREFERENCES:\n");
+        sb.append("CLIENT'S FOOD PREFERENCES:\n");
         if (prefs.getPreferredFoodsText() != null && !prefs.getPreferredFoodsText().isEmpty()) {
             sb.append("- Foods they like and want: ").append(prefs.getPreferredFoodsText()).append("\n");
         }
@@ -70,9 +73,14 @@ public class UserFoodPreferencesService {
         if (prefs.getDietaryStyle() != null && !prefs.getDietaryStyle().isEmpty()) {
             sb.append("- Dietary style: ").append(prefs.getDietaryStyle()).append("\n");
         }
-        sb.append("\nIMPORTANT: Use foods from their preferred list. Respect their preferences completely.\n");
-        sb.append("Do NOT exclude convenient, packaged, or restaurant foods if they fit macros.\n");
+        if (!isBlank(prefs.getAvoidedFoodsText())) {
+            sb.append("Treat the foods to avoid as a hard rule, the same as an allergy.\n");
+        }
         return sb.toString();
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.isBlank();
     }
 }
 
