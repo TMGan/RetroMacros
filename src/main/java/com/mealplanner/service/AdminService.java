@@ -26,6 +26,7 @@ public class AdminService {
     private final com.mealplanner.repository.AiCallLogRepository aiCallLogRepository;
     private final ProgressService progressService;
     private final com.mealplanner.repository.BodyCheckInRepository checkInRepository;
+    private final com.mealplanner.repository.MeasurementEntryRepository measurementRepository;
 
     public AdminService(UserRepository userRepository,
                         SavedMealPlanRepository savedMealPlanRepository,
@@ -36,7 +37,9 @@ public class AdminService {
                         com.mealplanner.repository.AiUsageRepository aiUsageRepository,
                         com.mealplanner.repository.AiCallLogRepository aiCallLogRepository,
                         ProgressService progressService,
-                        com.mealplanner.repository.BodyCheckInRepository checkInRepository) {
+                        com.mealplanner.repository.BodyCheckInRepository checkInRepository,
+                        com.mealplanner.repository.MeasurementEntryRepository measurementRepository) {
+        this.measurementRepository = measurementRepository;
         this.progressService = progressService;
         this.checkInRepository = checkInRepository;
         this.aiCallLogRepository = aiCallLogRepository;
@@ -201,6 +204,7 @@ public class AdminService {
         userFoodPreferencesRepository.findByUser(user).ifPresent(userFoodPreferencesRepository::delete);
         aiUsageRepository.deleteAll(aiUsageRepository.findByUser(user));
         checkInRepository.deleteAll(checkInRepository.findByUserOrderByCheckInDateAsc(user));
+        measurementRepository.deleteAll(measurementRepository.findByUserOrderByMeasuredOnAsc(user));
         // Spend history is kept for the books, but no longer points at the person.
         aiCallLogRepository.detachUser(user);
         // Saved meal plans go with the user (orphanRemoval on User.savedMealPlans).

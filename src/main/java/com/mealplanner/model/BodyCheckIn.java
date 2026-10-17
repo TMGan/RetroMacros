@@ -31,7 +31,8 @@ public class BodyCheckIn {
     @Column(name = "body_fat_pct")
     private Double bodyFatPct;
 
-    // Measurements in inches
+    // Legacy: measurements now live in MeasurementEntry. Old values are moved there on startup
+    // (LegacyMeasurementMigration) and these columns are no longer written.
     private Double waistIn;
     private Double hipsIn;
     private Double chestIn;

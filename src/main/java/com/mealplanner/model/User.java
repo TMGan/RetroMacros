@@ -41,6 +41,10 @@ public class User {
     @Column(name = "goal_weight_lbs")
     private Double goalWeightLbs;
 
+    // Which figure the body-measurement diagram shows: "male" or "female". Chosen by the client.
+    @Column(name = "body_diagram", length = 10)
+    private String bodyDiagram;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SavedMealPlan> savedMealPlans = new ArrayList<>();
 
@@ -83,4 +87,7 @@ public class User {
 
     public Double getGoalWeightLbs() { return goalWeightLbs; }
     public void setGoalWeightLbs(Double goalWeightLbs) { this.goalWeightLbs = goalWeightLbs; }
+
+    public String getBodyDiagram() { return bodyDiagram; }
+    public void setBodyDiagram(String bodyDiagram) { this.bodyDiagram = bodyDiagram; }
 }

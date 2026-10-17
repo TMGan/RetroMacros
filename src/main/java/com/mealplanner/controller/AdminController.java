@@ -31,6 +31,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final com.mealplanner.service.ProgressService progressService;
+    private final com.mealplanner.service.MeasurementService measurementService;
     private final UserRepository userRepository;
     private final SavedMealPlanRepository savedMealPlanRepository;
     private final FoodLogRepository foodLogRepository;
@@ -43,7 +44,9 @@ public class AdminController {
                            FoodLogRepository foodLogRepository,
                            AllowedEmailRepository allowedEmailRepository,
                            AdminAuditLogRepository auditLogRepository,
-                           com.mealplanner.service.ProgressService progressService) {
+                           com.mealplanner.service.ProgressService progressService,
+                           com.mealplanner.service.MeasurementService measurementService) {
+        this.measurementService = measurementService;
         this.progressService = progressService;
         this.allowedEmailRepository = allowedEmailRepository;
         this.auditLogRepository = auditLogRepository;
@@ -132,6 +135,7 @@ public class AdminController {
         model.addAttribute("summary", progressService.summary(client));
         model.addAttribute("chartJson", ProgressController.chartJson(progressService.chartData(client), new com.fasterxml.jackson.databind.ObjectMapper()));
         model.addAttribute("recentCheckIns", progressService.recentCheckIns(client, 5));
+        ProgressController.addMeasurementModel(model, client, measurementService);
         return "admin/user-details";
     }
 

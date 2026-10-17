@@ -8,6 +8,9 @@ import com.mealplanner.repository.UserRepository;
 import com.mealplanner.service.CurrentUserService;
 import com.mealplanner.service.FoodLogService;
 import com.mealplanner.service.ProgressService;
+import com.mealplanner.service.MeasurementService;
+import com.mealplanner.model.BodyPart;
+import java.util.EnumMap;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,16 +32,20 @@ public class ProgressController {
 
     // Clients can catch up on a missed day, but not rewrite old history or log the future.
     static final int MAX_BACKDATE_DAYS = 14;
+    // Measurements are monthly, so allow catching up on a session from the last month.
+    static final int MAX_MEASUREMENT_BACKDATE_DAYS = 30;
 
     private final ProgressService progressService;
+    private final MeasurementService measurementService;
     private final CurrentUserService currentUserService;
     private final FoodLogService foodLogService;
     private final UserRepository userRepository;
     private final ObjectMapper mapper = new ObjectMapper();
 
-    public ProgressController(ProgressService progressService, CurrentUserService currentUserService,
+    public ProgressController(ProgressService progressService, MeasurementService measurementService, CurrentUserService currentUserService,
                               FoodLogService foodLogService, UserRepository userRepository) {
         this.progressService = progressService;
+        this.measurementService = measurementService;
         this.currentUserService = currentUserService;
         this.foodLogService = foodLogService;
         this.userRepository = userRepository;
@@ -54,6 +61,8 @@ public class ProgressController {
         model.addAttribute("today", today);
         model.addAttribute("earliestDate", today.minusDays(MAX_BACKDATE_DAYS));
         model.addAttribute("todayEntry", progressService.checkInOn(user, today).orElse(null));
+        addMeasurementModel(model, user, measurementService);
+        model.addAttribute("measurementEarliest", today.minusDays(MAX_MEASUREMENT_BACKDATE_DAYS));
         model.addAttribute("impersonating", currentUserService.isViewingAs(session));
         return "progress";
     }
@@ -63,11 +72,6 @@ public class ProgressController {
                           @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
                           @RequestParam Double weight,
                           @RequestParam(required = false) Double bodyFat,
-                          @RequestParam(required = false) Double waist,
-                          @RequestParam(required = false) Double hips,
-                          @RequestParam(required = false) Double chest,
-                          @RequestParam(required = false) Double arm,
-                          @RequestParam(required = false) Double thigh,
                           @RequestParam(required = false) Integer energy,
                           @RequestParam(required = false) Integer sleep,
                           @RequestParam(required = false) Integer hunger,
@@ -85,9 +89,6 @@ public class ProgressController {
             error = "Weight must be between 70 and 700 lb.";
         } else if (!optionalInRange(bodyFat, 3, 70)) {
             error = "Body fat must be between 3% and 70%.";
-        } else if (!optionalInRange(waist, 10, 90) || !optionalInRange(hips, 10, 90) || !optionalInRange(chest, 10, 90)
-                || !optionalInRange(arm, 4, 40) || !optionalInRange(thigh, 6, 60)) {
-            error = "One of the measurements looks off. Use inches.";
         } else if (!optionalScore(energy) || !optionalScore(sleep) || !optionalScore(hunger) || !optionalScore(stress)) {
             error = "Scores must be between 1 and 5.";
         }
@@ -99,11 +100,6 @@ public class ProgressController {
         BodyCheckIn values = new BodyCheckIn();
         values.setWeightLbs(round1(weight));
         values.setBodyFatPct(round1(bodyFat));
-        values.setWaistIn(round1(waist));
-        values.setHipsIn(round1(hips));
-        values.setChestIn(round1(chest));
-        values.setArmIn(round1(arm));
-        values.setThighIn(round1(thigh));
         values.setEnergy(energy);
         values.setSleep(sleep);
         values.setHunger(hunger);
@@ -115,6 +111,55 @@ public class ProgressController {
 
         redirectAttributes.addFlashAttribute("success", day.equals(today) ? "Check-in saved." : "Check-in saved for " + day + ".");
         return "redirect:/progress";
+    }
+
+    /**
+     * Saves a tape-measure session from the body diagram. Inputs are named m_&lt;spot&gt;
+     * (m_waist, m_armLeft, ...); blank ones are skipped.
+     */
+    @PostMapping("/measurements")
+    public String saveMeasurements(@AuthenticationPrincipal OAuth2User principal,
+                                   @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+                                   @RequestParam(required = false) String diagram,
+                                   @RequestParam Map<String, String> params,
+                                   RedirectAttributes redirectAttributes) {
+        User user = currentUserService.require(principal);
+        LocalDate today = foodLogService.today(user);
+        LocalDate day = date == null ? today : date;
+        if (day.isAfter(today) || day.isBefore(today.minusDays(MAX_MEASUREMENT_BACKDATE_DAYS))) {
+            redirectAttributes.addFlashAttribute("measurementError", "Measurements can be for today or up to " + MAX_MEASUREMENT_BACKDATE_DAYS + " days back.");
+            return "redirect:/progress#measurements";
+        }
+
+        Map<BodyPart, Double> values = new EnumMap<>(BodyPart.class);
+        for (BodyPart part : BodyPart.values()) {
+            String raw = params.get("m_" + part.getKey());
+            if (raw == null || raw.isBlank()) continue;
+            Double value;
+            try {
+                value = Double.valueOf(raw.trim());
+            } catch (NumberFormatException e) {
+                value = null;
+            }
+            if (value == null || !inRange(value, part.getMin(), part.getMax())) {
+                redirectAttributes.addFlashAttribute("measurementError",
+                        part.getLabel() + " should be between " + (int) part.getMin() + " and " + (int) part.getMax() + " inches.");
+                return "redirect:/progress#measurements";
+            }
+            values.put(part, round1(value));
+        }
+        if (values.isEmpty()) {
+            redirectAttributes.addFlashAttribute("measurementError", "Enter at least one measurement.");
+            return "redirect:/progress#measurements";
+        }
+
+        if ("male".equals(diagram) || "female".equals(diagram)) {
+            user.setBodyDiagram(diagram);
+            userRepository.save(user);
+        }
+        measurementService.save(user, day, values);
+        redirectAttributes.addFlashAttribute("measurementSuccess", "Measurements saved. Next reminder in 4 weeks.");
+        return "redirect:/progress#measurements";
     }
 
     @PostMapping("/goal")
@@ -130,6 +175,14 @@ public class ProgressController {
         userRepository.save(user);
         redirectAttributes.addFlashAttribute("success", goalWeight == null ? "Goal weight cleared." : "Goal weight saved.");
         return "redirect:/progress";
+    }
+
+    /** Everything the measurement section needs. Shared with the coach's client page. */
+    static void addMeasurementModel(Model model, User user, MeasurementService measurementService) {
+        model.addAttribute("msummary", measurementService.summary(user));
+        model.addAttribute("diagramRows", measurementService.diagram(user));
+        model.addAttribute("bodyDiagram", "female".equals(user.getBodyDiagram()) ? "female" : "male");
+        model.addAttribute("measurementJson", chartJson(measurementService.chartData(user), new ObjectMapper()));
     }
 
     /** Chart data as JSON for a script tag. Escapes "<" so it can never close the tag early. */

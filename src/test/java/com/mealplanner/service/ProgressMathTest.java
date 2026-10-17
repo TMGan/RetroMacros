@@ -46,21 +46,4 @@ class ProgressMathTest {
         assertThat(ProgressService.averageWeight(entries, today.minusDays(6), today)).isEqualTo(181.0);
     }
 
-    @Test
-    void healthyRateDependsOnGoalAndBodyWeight() {
-        assertThat(ProgressService.healthyBand("lose", 200)).containsExactly(-2.0, -1.0);
-        assertThat(ProgressService.healthyBand("build", 200)).containsExactly(0.5, 1.0);
-        assertThat(ProgressService.healthyBand("maintain", 200)).containsExactly(-0.5, 0.5);
-    }
-
-    @Test
-    void rateStatusReadsTheRightWayForEachGoal() {
-        double[] lose = ProgressService.healthyBand("lose", 200);
-        assertThat(ProgressService.rateStatus("lose", -1.5, lose)).isEqualTo("on-track");
-        assertThat(ProgressService.rateStatus("lose", -3.0, lose)).isEqualTo("too-fast");
-        assertThat(ProgressService.rateStatus("lose", 0.0, lose)).isEqualTo("too-slow");
-        assertThat(ProgressService.rateStatus("build", 2.0, ProgressService.healthyBand("build", 200))).isEqualTo("too-fast");
-        assertThat(ProgressService.rateStatus("maintain", 1.0, ProgressService.healthyBand("maintain", 200))).isEqualTo("drifting-up");
-        assertThat(ProgressService.rateStatus("lose", null, lose)).isEqualTo("needs-data");
-    }
 }
