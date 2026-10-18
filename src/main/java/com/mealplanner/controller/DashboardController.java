@@ -75,6 +75,12 @@ public class DashboardController {
         model.addAttribute("impersonating", viewingAs);
         model.addAttribute("checkInDue", !viewingAs && !currentUserService.isDemo(user) && progressService.missedCheckIn(user));
         model.addAttribute("measurementsDue", !viewingAs && !currentUserService.isDemo(user) && measurementService.isDue(user));
+        // A ramping client gets new targets each week; nudge them once the week has moved past their plan's.
+        Integer rampWeekNow = com.mealplanner.service.MacroCalculatorService.rampWeek(user.getRampStartDate(), foodLogService.today(user));
+        model.addAttribute("rampWeekNow", rampWeekNow);
+        model.addAttribute("rampNewWeek", !viewingAs && latestPlan != null && latestPlan.getRampWeek() != null
+                && !java.util.Objects.equals(latestPlan.getRampWeek(), rampWeekNow == null ? 4 : rampWeekNow)
+                && (rampWeekNow == null || rampWeekNow > latestPlan.getRampWeek()));
         return "dashboard";
     }
 }

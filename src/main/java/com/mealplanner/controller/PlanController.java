@@ -50,9 +50,11 @@ public class PlanController {
         try {
             MealPlan mealPlan = mapper.readValue(saved.getMealPlanJson(), MealPlan.class);
             GroceryList groceryList = mapper.readValue(saved.getGroceryListJson(), GroceryList.class);
-            MacroTargets targets = new MacroTargets(saved.getTargetCalories(), saved.getTargetProtein(), saved.getTargetCarbs(), saved.getTargetFat());
+            com.mealplanner.model.NutritionTargets nutrition = com.mealplanner.model.NutritionTargets.fromSaved(saved);
+            MacroTargets targets = nutrition.toMacroTargets();
 
             model.addAttribute("targets", targets);
+            model.addAttribute("nutrition", nutrition);
             model.addAttribute("mealPlan", mealPlan);
             model.addAttribute("groceryList", groceryList);
             return "results"; // reuse results template for display

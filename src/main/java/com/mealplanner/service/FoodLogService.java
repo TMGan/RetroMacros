@@ -118,6 +118,9 @@ public class FoodLogService {
             }
             String aiResponse = aiClient.complete(user, AiClient.Kind.ESTIMATE, buildMacroEstimationPromptV2(desc));
             return parseMacroResponse(aiResponse);
+        } catch (AiClient.AiException e) {
+            // Outages and spend caps carry a message meant for the client.
+            throw e;
         } catch (Exception e) {
             System.err.println("Error estimating macros: " + e.getMessage());
             return null;
@@ -197,40 +200,6 @@ public class FoodLogService {
         return out;
     }
 
-    public String suggestHealthierAlternative(User user, String originalFood, int calories, int protein, int carbs, int fat) {
-        String lower = originalFood.toLowerCase();
-        boolean needsAlt = lower.contains("hot pocket") || lower.contains("pizza") || lower.contains("mcdonald")
-                || lower.contains("burger king") || lower.contains("taco bell") || lower.contains("fast food")
-                || lower.contains("frozen");
-        if (!needsAlt) return null;
-        if ("true".equalsIgnoreCase(env.getProperty("ai.mock", "false"))) return null;
-        try {
-            String prompt = buildHealthierAlternativePrompt(originalFood, calories, protein, carbs, fat);
-            String suggestion = aiClient.complete(user, AiClient.Kind.ALTERNATIVE, prompt).trim();
-            return suggestion.length() > 300 ? suggestion.substring(0, 300) : suggestion;
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
-    private String buildHealthierAlternativePrompt(String originalFood, int cal, int p, int c, int f) {
-        return String.format(
-                "The user ate: \"%s\" (%d cal, %dg P, %dg C, %dg F)\n\n" +
-                        "Suggest a healthier whole food alternative with similar macros.\n\n" +
-                        "REQUIREMENTS:\n" +
-                        "- Similar total calories (within 50 cal)\n" +
-                        "- Similar macros (within 10g each)\n" +
-                        "- Use whole foods (chicken, fish, eggs, white rice, vegetables, etc.)\n" +
-                        "- Be realistic and practical\n" +
-                        "- One short sentence suggestion\n\n" +
-                        "EXAMPLE:\n" +
-                        "Original: Hot Pocket (320 cal, 12g P, 38g C, 12g F)\n" +
-                        "Suggestion: Grilled chicken wrap with whole wheat tortilla and veggies\n\n" +
-                        "Your suggestion (one sentence only):",
-                originalFood, cal, p, c, f
-        );
-    }
-
     // --- Random healthy meal suggestion ---
     private static final com.fasterxml.jackson.databind.ObjectMapper JSON = new com.fasterxml.jackson.databind.ObjectMapper();
     private static final java.util.Random RANDOM = new java.util.Random();
@@ -275,6 +244,8 @@ public class FoodLogService {
                 if (meal != null && !mealViolations(meal, allergies).isEmpty()) return null;
             }
             return meal;
+        } catch (AiClient.AiException e) {
+            throw e;
         } catch (Exception e) {
             System.err.println("Error generating random meal: " + e.getMessage());
             return null;
@@ -300,6 +271,7 @@ public class FoodLogService {
         return String.format(
                 "Suggest one healthy, balanced meal of about %d calories that a home cook can make in under 30 minutes.\n" +
                 "Build it around %s, in the style of a %s. Common grocery-store ingredients only.\n" +
+                "Include at least one vegetable, and favor whole, minimally processed foods.\n" +
                 // Client text can contain "%", which String.format would read as a placeholder.
                 (rules + preferences).replace("%", "%%") + "\n" +
                 "Respond with ONLY a JSON object. No prose, no code fences. Use exactly these keys:\n" +

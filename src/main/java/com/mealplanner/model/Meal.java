@@ -8,6 +8,16 @@ public class Meal {
     private List<FoodItem> foods;
     private MacroTargets macros;
     private Recipe recipe;
+    // breakfast, lunch, dinner or snack. Decides which meals must include a vegetable.
+    private String type;
+
+    public String getType() {
+        return type;
+    }
+
+    public void setType(String type) {
+        this.type = type;
+    }
 
     public Meal() {
         this.foods = new ArrayList<>();

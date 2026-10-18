@@ -136,7 +136,22 @@ public class AdminController {
         model.addAttribute("chartJson", ProgressController.chartJson(progressService.chartData(client), new com.fasterxml.jackson.databind.ObjectMapper()));
         model.addAttribute("recentCheckIns", progressService.recentCheckIns(client, 5));
         ProgressController.addMeasurementModel(model, client, measurementService);
+        model.addAttribute("healthLabels", com.mealplanner.model.HealthCondition.parse(client.getHealthConditions()).stream()
+                .map(com.mealplanner.model.HealthCondition::getLabel).toList());
         return "admin/user-details";
+    }
+
+    /** The coach confirms a doctor has cleared a flagged client, so plans use normal targets again (or undoes it). */
+    @PostMapping("/users/{userId}/health-clearance")
+    public String setHealthClearance(@AuthenticationPrincipal OAuth2User principal,
+                                     @PathVariable Long userId,
+                                     @RequestParam boolean cleared) {
+        requireAdmin(principal);
+        User client = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        client.setHealthCleared(cleared);
+        userRepository.save(client);
+        auditLogRepository.save(new AdminAuditLog(getCurrentUser(principal).getEmail(), cleared ? "HEALTH_CLEAR" : "HEALTH_HOLD", "user:" + userId));
+        return "redirect:/admin/users/" + userId + "?healthSaved=true";
     }
 
     @PostMapping("/users/{userId}/goal")

@@ -31,7 +31,7 @@ public class AiClient {
     /** What a call is for. Decides the model, output allowance and effort. */
     public enum Kind {
         PLAN(true, 16000), PLAN_REPAIR(true, 16000), SWAP(true, 8000),
-        ESTIMATE(false, 2000), SUGGESTION(false, 4000), ALTERNATIVE(false, 2000);
+        ESTIMATE(false, 2000), SUGGESTION(false, 4000);
 
         final boolean usesPlanModel;
         // Includes the model's thinking, so it is well above the visible answer size.
@@ -92,6 +92,7 @@ public class AiClient {
         if (client == null) {
             throw new AiException("AI is not configured on this server.", null);
         }
+        checkBudget(user);
         String model = kind.usesPlanModel ? planModel : logModel;
         MessageCreateParams params = MessageCreateParams.builder()
                 .model(model)
@@ -135,6 +136,35 @@ public class AiClient {
                 .collect(Collectors.joining());
         record(user, kind, model, inputTokens, outputTokens, true, null, started);
         return text;
+    }
+
+    /** Spend caps over the last 30 days, in dollars: per client (the coach is exempt) and for the whole app. */
+    public double userBudgetUsd() {
+        return env.getProperty("ai.budget.user-30d-usd", Double.class, 4.0);
+    }
+
+    public double globalBudgetUsd() {
+        return env.getProperty("ai.budget.global-30d-usd", Double.class, 150.0);
+    }
+
+    /**
+     * Stops a call before it is made once a cap is reached, so one heavy user (or a bug in a
+     * retry loop) can't run up the bill. Daily request limits live in {@link AiQuotaService}.
+     */
+    private void checkBudget(User user) {
+        if (aiCallLogRepository == null) return;
+        java.time.LocalDateTime since = java.time.LocalDateTime.now().minusDays(30);
+        if (aiCallLogRepository.sumCostMicrosSince(since) >= globalBudgetUsd() * 1_000_000) {
+            log.warn("Global AI budget of ${} per 30 days reached; refusing AI calls", globalBudgetUsd());
+            throw new AiException("AI features are paused for a short while. Your coach has been notified. "
+                    + "You can still log food by entering the numbers yourself.", null);
+        }
+        if (user != null && !user.isAdmin()
+                && aiCallLogRepository.sumCostMicrosForUserSince(user, since) >= userBudgetUsd() * 1_000_000) {
+            log.info("User {} reached the per-user AI budget", user.getId());
+            throw new AiException("You've reached your AI allowance for now. It frees up gradually over the next few weeks. "
+                    + "You can still log food by entering the numbers yourself, and your coach can help in the meantime.", null);
+        }
     }
 
     private void record(User user, Kind kind, String model, long inputTokens, long outputTokens,

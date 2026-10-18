@@ -70,8 +70,18 @@
             <div class="card neon"><div class="card-body">
                 <h2 class="card-title mb-4">Today's Progress</h2>
                 <div th:if="${latestPlan != null}">
-                    <p class="text-muted">Your daily targets (from latest meal plan):</p>
-                    <div class="row text-center mb-4">
+                    <div class="alert alert-info d-flex flex-wrap justify-content-between align-items-center gap-2" th:if="${rampNewWeek}">
+                        <span th:text="${rampWeekNow != null} ? 'Week ' + ${rampWeekNow} + ' of 4 has started. Make a new plan to get the targets for this week.' : 'Your 4 weeks of easing in are done. Make a new plan to get your full targets.'">Week 2 of 4 has started.</span>
+                        <a href="/form" class="btn btn-sm btn-neon">New plan</a>
+                    </div>
+                    <p class="text-muted">Your daily targets (from latest meal plan)<span th:if="${latestPlan.rampWeek != null}" th:text="', easing in week ' + ${latestPlan.rampWeek} + ' of 4'"></span>:</p>
+                    <!-- Simple mode: calories and protein are the two numbers that matter most, so they lead. -->
+                    <div class="row text-center mb-4" th:if="${latestPlan.simple}">
+                        <div class="col-6"><h3 th:text="${latestPlan.targetCalories}">0</h3><small>Calories</small></div>
+                        <div class="col-6"><h3 th:text="${latestPlan.targetProtein + 'g'}">0g</h3><small>Protein</small></div>
+                        <div class="col-12 mt-2 text-muted small" th:text="'Carbs ' + ${latestPlan.targetCarbs} + 'g · Fat ' + ${latestPlan.targetFat} + 'g'">Carbs · Fat</div>
+                    </div>
+                    <div class="row text-center mb-4" th:unless="${latestPlan.simple}">
                         <div class="col-3"><h3 th:text="${latestPlan.targetCalories}">0</h3><small>Calories</small></div>
                         <div class="col-3"><h3 th:text="${latestPlan.targetProtein + 'g'}">0g</h3><small>Protein</small></div>
                         <div class="col-3"><h3 th:text="${latestPlan.targetCarbs + 'g'}">0g</h3><small>Carbs</small></div>
@@ -276,11 +286,6 @@
                 <button type="button" class="btn btn-primary mb-3" onclick="estimateFromManualInput(event)">
                     <i class="bi bi-calculator"></i> Estimate Macros
                 </button>
-                <div id="healthierAlternative" class="alert alert-success" style="display: none;">
-                    <strong><i class="bi bi-lightbulb"></i> Healthier Alternative:</strong>
-                    <p class="mb-0 mt-2" id="healthierAlternativeText"></p>
-                    <small class="text-muted">Similar macros, whole food option</small>
-                </div>
             </div>
 
             <!-- Common Section: Meal Name -->
@@ -329,18 +334,21 @@
             </div>
             <div class="mb-4">
                 <label class="form-label"><strong>How do you prefer to eat?</strong></label>
-                <select class="form-select" name="cookingPreference" th:value="${userPreferences?.cookingPreference}">
-                    <option value="mostly-home-cooked">Mostly home-cooked meals</option>
-                    <option value="mixed">Mix of home-cooked and eating out</option>
-                    <option value="convenience-focused">Convenience-focused (meal prep, frozen, eating out)</option>
+                <select class="form-select" name="cookingPreference" th:with="cp=${userPreferences?.cookingPreference}">
+                    <option value="mostly-home-cooked" th:selected="${cp == 'mostly-home-cooked'}">Mostly home-cooked meals</option>
+                    <option value="mixed" th:selected="${cp == 'mixed'}">Mix of home-cooked and eating out</option>
+                    <option value="convenience-focused" th:selected="${cp == 'convenience-focused'}">Convenience-focused (meal prep, frozen, eating out)</option>
                 </select>
             </div>
             <div class="mb-4">
                 <label class="form-label"><strong>Dietary Approach</strong></label>
-                <select class="form-select" name="dietaryStyle" th:value="${userPreferences?.dietaryStyle}">
-                    <option value="flexible">Flexible - whatever fits my macros</option>
-                    <option value="mostly-whole-foods">Mostly whole foods with some processed</option>
-                    <option value="clean-eating">Clean eating focused</option>
+                <select class="form-select" name="dietaryStyle" th:with="ds=${userPreferences?.dietaryStyle}">
+                    <option value="flexible" th:selected="${ds == 'flexible'}">Flexible - whatever fits my macros</option>
+                    <option value="mostly-whole-foods" th:selected="${ds == 'mostly-whole-foods'}">Mostly whole foods with some processed</option>
+                    <option value="whole-foods-only" th:selected="${ds == 'whole-foods-only' or ds == 'clean-eating'}">Whole foods only</option>
+                    <option value="vegetarian" th:selected="${ds == 'vegetarian'}">Vegetarian</option>
+                    <option value="vegan" th:selected="${ds == 'vegan'}">Vegan</option>
+                    <option value="pescatarian" th:selected="${ds == 'pescatarian'}">Pescatarian (fish, no other meat)</option>
                 </select>
             </div>
         </div>
@@ -361,8 +369,6 @@ function switchToSuggestedMode() {
     document.getElementById('manualModeBtn').classList.remove('active');
     document.getElementById('suggestedModeSection').style.display = 'block';
     document.getElementById('manualModeSection').style.display = 'none';
-    const ha = document.getElementById('healthierAlternative');
-    if (ha) ha.style.display = 'none';
 }
 function switchToManualMode() {
     currentMode = 'manual';
@@ -479,7 +485,7 @@ function estimateFromManualInput(ev) {
     const originalHTML = btn.innerHTML;
     btn.disabled = true;
     btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Estimating...';
-    fetch('/food-log/estimate-with-alternative', {
+    fetch('/food-log/estimate-macros', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', [getCsrf().header]: getCsrf().token },
         body: 'foodDescription=' + encodeURIComponent(desc)
@@ -494,10 +500,6 @@ function estimateFromManualInput(ev) {
             document.getElementById('protein').value = data.protein;
             document.getElementById('carbs').value = data.carbs;
             document.getElementById('fat').value = data.fat;
-            if (data.healthierAlternative) {
-                document.getElementById('healthierAlternativeText').textContent = data.healthierAlternative;
-                document.getElementById('healthierAlternative').style.display = 'block';
-            }
             showAlert('Macros estimated!', 'success');
         } else {
             showAlert(data.error || 'Could not estimate macros.', 'warning');

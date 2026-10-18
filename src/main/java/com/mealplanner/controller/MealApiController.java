@@ -87,6 +87,9 @@ public class MealApiController {
             return ResponseEntity.ok(replacement);
         } catch (AiQuotaService.QuotaExceededException e) {
             return ResponseEntity.status(429).body(Map.of("error", e.getMessage()));
+        } catch (com.mealplanner.service.AiClient.AiException e) {
+            // Written for the client: allergy refusals, outages, spend caps.
+            return ResponseEntity.status(503).body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             log.warn("Meal swap failed for user {}", user.getId(), e);
             return ResponseEntity.status(500).body(Map.of("error", "Could not generate replacement meal"));

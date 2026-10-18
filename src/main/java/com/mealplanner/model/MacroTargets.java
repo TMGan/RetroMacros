@@ -5,6 +5,16 @@ public class MacroTargets {
     private int protein;
     private int carbs;
     private int fat;
+    // Grams of fiber. Optional: older saved plans and AI answers may not have it.
+    private Integer fiber;
+
+    public Integer getFiber() {
+        return fiber;
+    }
+
+    public void setFiber(Integer fiber) {
+        this.fiber = fiber;
+    }
 
     public MacroTargets() {
     }
