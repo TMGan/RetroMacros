@@ -75,9 +75,9 @@ class ProgressFeatureTest {
         User client = newUser(false);
         mvc.perform(checkIn("182.4").param("bodyFat", "21.5").param("energy", "4").param("note", "Felt good")
                         .with(signedInAs(client)).with(csrf()))
-                .andExpect(redirectedUrl("/progress"))
+                .andExpect(redirectedUrl("/progress#overview"))
                 .andExpect(flash().attribute("success", "Check-in saved."));
-        mvc.perform(checkIn("181.9").with(signedInAs(client)).with(csrf())).andExpect(redirectedUrl("/progress"));
+        mvc.perform(checkIn("181.9").with(signedInAs(client)).with(csrf())).andExpect(redirectedUrl("/progress#overview"));
 
         List<BodyCheckIn> saved = checkInRepository.findByUserOrderByCheckInDateAsc(client);
         assertThat(saved).hasSize(1);
@@ -148,7 +148,7 @@ class ProgressFeatureTest {
         User client = newUser(false);
         User coach = newUser(true);
         mvc.perform(post("/progress/goal").param("goalWeight", "175").with(signedInAs(client)).with(csrf()))
-                .andExpect(redirectedUrl("/progress"));
+                .andExpect(redirectedUrl("/progress#goal"));
         assertThat(userRepository.findById(client.getId()).orElseThrow().getGoalWeightLbs()).isEqualTo(175.0);
 
         long audits = auditLogRepository.count();
@@ -206,5 +206,19 @@ class ProgressFeatureTest {
         mvc.perform(post("/admin/users/" + client.getId() + "/delete").with(signedInAs(coach)).with(csrf()))
                 .andExpect(redirectedUrl("/admin/users?deleted=true"));
         assertThat(checkInRepository.findAll().stream().noneMatch(c -> c.getUser().getId().equals(client.getId()))).isTrue();
+    }
+
+    @Test
+    void progressPageHasASectionMenu() throws Exception {
+        String html = mvc.perform(get("/progress").with(signedInAs(newUser(false))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+
+        for (String id : java.util.List.of("checkin", "overview", "charts", "details", "measurements", "goal")) {
+            assertThat(html).contains("data-section=\"" + id + "\"");
+            assertThat(html).contains("<section class=\"progress-section\" id=\"" + id + "\"");
+        }
+        // A client who hasn't checked in today starts on the check-in.
+        assertThat(html).contains("data-default=\"checkin\"");
     }
 }

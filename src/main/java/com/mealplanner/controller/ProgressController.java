@@ -34,6 +34,14 @@ public class ProgressController {
     static final int MAX_BACKDATE_DAYS = 14;
     // Measurements are monthly, so allow catching up on a session from the last month.
     static final int MAX_MEASUREMENT_BACKDATE_DAYS = 30;
+    // The page's sections, picked from the menu: anchor id, label, icon.
+    static final java.util.List<String[]> SECTIONS = java.util.List.of(
+            new String[]{"checkin", "Check in", "bi-check2-circle"},
+            new String[]{"overview", "Overview", "bi-speedometer2"},
+            new String[]{"charts", "Charts", "bi-graph-up"},
+            new String[]{"details", "Details", "bi-list-check"},
+            new String[]{"measurements", "Measurements", "bi-rulers"},
+            new String[]{"goal", "Goal", "bi-flag"});
 
     private final ProgressService progressService;
     private final MeasurementService measurementService;
@@ -64,6 +72,7 @@ public class ProgressController {
         addMeasurementModel(model, user, measurementService);
         model.addAttribute("measurementEarliest", today.minusDays(MAX_MEASUREMENT_BACKDATE_DAYS));
         model.addAttribute("impersonating", currentUserService.isViewingAs(session));
+        model.addAttribute("progressSections", SECTIONS);
         return "progress";
     }
 
@@ -94,7 +103,7 @@ public class ProgressController {
         }
         if (error != null) {
             redirectAttributes.addFlashAttribute("error", error);
-            return "redirect:/progress";
+            return "redirect:/progress#checkin";
         }
 
         BodyCheckIn values = new BodyCheckIn();
@@ -110,7 +119,7 @@ public class ProgressController {
         progressService.saveCheckIn(user, day, values);
 
         redirectAttributes.addFlashAttribute("success", day.equals(today) ? "Check-in saved." : "Check-in saved for " + day + ".");
-        return "redirect:/progress";
+        return "redirect:/progress#overview";
     }
 
     /**
@@ -169,12 +178,12 @@ public class ProgressController {
         User user = currentUserService.require(principal);
         if (goalWeight != null && !inRange(goalWeight, 70, 700)) {
             redirectAttributes.addFlashAttribute("error", "Goal weight must be between 70 and 700 lb.");
-            return "redirect:/progress";
+            return "redirect:/progress#goal";
         }
         user.setGoalWeightLbs(round1(goalWeight));
         userRepository.save(user);
         redirectAttributes.addFlashAttribute("success", goalWeight == null ? "Goal weight cleared." : "Goal weight saved.");
-        return "redirect:/progress";
+        return "redirect:/progress#goal";
     }
 
     /** Everything the measurement section needs. Shared with the coach's client page. */

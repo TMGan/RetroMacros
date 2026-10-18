@@ -21,6 +21,33 @@
 
     <div th:if="${success}" class="alert alert-success" th:text="${success}">Saved</div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}">Error</div>
+
+    <!-- Section menu: tabs on wide screens, a menu button on phones. Without JavaScript every section just shows. -->
+    <nav class="progress-menu mb-4" aria-label="Progress sections"
+         th:attr="data-default=${todayEntry == null and !impersonating} ? 'checkin' : 'overview'">
+        <ul class="nav nav-pills d-none d-md-flex gap-1">
+            <li class="nav-item" th:each="s : ${progressSections}">
+                <a class="nav-link" th:href="'#' + ${s[0]}" th:attr="data-section=${s[0]}">
+                    <i th:class="'bi ' + ${s[2]}"></i> <span th:text="${s[1]}">Section</span>
+                </a>
+            </li>
+        </ul>
+        <div class="dropdown d-md-none">
+            <button class="btn btn-outline-neon dropdown-toggle w-100 d-flex align-items-center gap-2" type="button"
+                    data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-list"></i> <span class="progress-menu-current">Sections</span>
+            </button>
+            <ul class="dropdown-menu w-100">
+                <li th:each="s : ${progressSections}">
+                    <a class="dropdown-item" th:href="'#' + ${s[0]}" th:attr="data-section=${s[0]}">
+                        <i th:class="'bi ' + ${s[2]}"></i> <span th:text="${s[1]}">Section</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </nav>
+
+    <section class="progress-section" id="checkin">
     <div th:if="${summary.hasData && summary.missedCheckIn}" class="alert alert-warning">
         No check-in in the last 7 days. A quick weigh-in keeps your trend line honest.
     </div>
@@ -80,17 +107,30 @@
         </div>
     </div>
 
-    <div th:unless="${summary.hasData}" class="card neon mb-4">
-        <div class="card-body text-center text-muted py-4">Your charts appear after your first check-in.</div>
-    </div>
+    </section>
 
-    <th:block th:replace="~{fragments/progress :: stats(${summary})}"></th:block>
-    <th:block th:if="${summary.hasData}"><th:block th:replace="~{fragments/progress :: charts(${chartJson})}"></th:block></th:block>
-    <th:block th:replace="~{fragments/progress :: recap(${summary}, ${msummary})}"></th:block>
-    <th:block th:replace="~{fragments/progress :: details(${summary})}"></th:block>
+    <section class="progress-section" id="overview">
+        <div th:unless="${summary.hasData}" class="card neon mb-4">
+            <div class="card-body text-center text-muted py-4">Your numbers appear after your first check-in.</div>
+        </div>
+        <th:block th:replace="~{fragments/progress :: stats(${summary})}"></th:block>
+        <th:block th:replace="~{fragments/progress :: recap(${summary}, ${msummary})}"></th:block>
+    </section>
+
+    <section class="progress-section" id="charts">
+        <div th:unless="${summary.hasData}" class="card neon mb-4">
+            <div class="card-body text-center text-muted py-4">Your charts appear after your first check-in.</div>
+        </div>
+        <th:block th:if="${summary.hasData}"><th:block th:replace="~{fragments/progress :: charts(${chartJson})}"></th:block></th:block>
+    </section>
+
+    <section class="progress-section" id="details">
+        <th:block th:replace="~{fragments/progress :: details(${summary})}"></th:block>
+    </section>
 
     <!-- Measurements: monthly, entered on the body diagram -->
-    <div class="card neon mb-4" id="measurements">
+    <section class="progress-section" id="measurements">
+    <div class="card neon mb-4">
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
                 <h5 class="mb-0"><i class="bi bi-rulers"></i> Measurements</h5>
@@ -111,7 +151,10 @@
         </div>
     </div>
 
+    </section>
+
     <!-- Goal weight -->
+    <section class="progress-section" id="goal">
     <div class="card neon mb-4">
         <div class="card-body">
             <h5 class="mb-1">Goal weight</h5>
@@ -127,9 +170,11 @@
             </form>
         </div>
     </div>
+    </section>
 </div>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/js/progress-sections.js}"></script>
 <script th:src="@{/webjars/chart.js/dist/chart.umd.min.js}"></script>
 <script th:src="@{/js/progress-charts.js}"></script>
 <script th:src="@{/js/measurements.js}"></script>
