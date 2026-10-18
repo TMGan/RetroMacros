@@ -42,6 +42,8 @@
                 <div class="stat-label">AI cost this month</div>
                 <div class="stat-value" th:text="'$' + ${aiCostThisMonth}">$0</div>
                 <div class="stat-sub" th:text="'$' + ${aiCostAllTime} + ' all time'">$0 all time</div>
+                <div class="stat-sub" th:text="'Last 30 days: $' + ${aiCost30d} + ' of $' + ${aiBudget30d} + ' cap (' + ${aiBudgetUsedPct} + '%)'">Last 30 days</div>
+                <div class="stat-sub" th:text="'Per client cap: $' + ${aiUserBudget} + ' per 30 days'">Per client cap</div>
             </div></div>
         </div>
         <div class="col-6 col-lg-4 col-xl-2">

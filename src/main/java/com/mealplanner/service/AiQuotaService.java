@@ -30,10 +30,12 @@ public class AiQuotaService {
     private final int foodLogsPerDay;
     private final int swapRecordsPerDay;
     private final int planSavesPerDay;
+    private final int plansPerWeek;
 
     public AiQuotaService(AiUsageRepository aiUsageRepository,
-                          @Value("${ai.limit.plans-per-day:3}") int plansPerDay,
-                          @Value("${ai.limit.swaps-per-day:15}") int swapsPerDay,
+                          @Value("${ai.limit.plans-per-day:2}") int plansPerDay,
+                          @Value("${ai.limit.plans-per-week:5}") int plansPerWeek,
+                          @Value("${ai.limit.swaps-per-day:10}") int swapsPerDay,
                           @Value("${ai.limit.estimates-per-day:40}") int estimatesPerDay,
                           @Value("${app.limit.food-logs-per-day:100}") int foodLogsPerDay,
                           @Value("${app.limit.swap-records-per-day:50}") int swapRecordsPerDay,
@@ -43,6 +45,7 @@ public class AiQuotaService {
         this.planSavesPerDay = planSavesPerDay;
         this.aiUsageRepository = aiUsageRepository;
         this.plansPerDay = plansPerDay;
+        this.plansPerWeek = plansPerWeek;
         this.swapsPerDay = swapsPerDay;
         this.estimatesPerDay = estimatesPerDay;
     }
@@ -57,6 +60,11 @@ public class AiQuotaService {
         if (usage.getRequestCount() >= limit) {
             throw new QuotaExceededException("You have reached today's limit of " + limit + " "
                     + label(kind) + ". It resets at midnight UTC.");
+        }
+        // Plans are the expensive call, so they also have a weekly cap.
+        if (kind == Kind.PLAN && aiUsageRepository.sumRequestsSince(user, kind.name(), today.minusDays(6)) >= plansPerWeek) {
+            throw new QuotaExceededException("You've made " + plansPerWeek + " meal plans in the last 7 days, which is the weekly limit. "
+                    + "Your saved plans are under My Plans, and you can make a new one in a few days.");
         }
         usage.setRequestCount(usage.getRequestCount() + 1);
         aiUsageRepository.save(usage);

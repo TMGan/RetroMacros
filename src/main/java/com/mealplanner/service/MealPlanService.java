@@ -19,8 +19,8 @@ public class MealPlanService {
 
     // The JSON shape every plan must come back in. Kept as plain JSON so the model copies it cleanly.
     private static final String MEAL_SCHEMA = """
-            {"name": string, "foods": [{"item": string, "portion": string}], \
-            "macros": {"calories": number, "protein": number, "carbs": number, "fat": number}, \
+            {"name": string, "type": "breakfast" | "lunch" | "dinner" | "snack", "foods": [{"item": string, "portion": string}], \
+            "macros": {"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number}, \
             "recipe": {"name": string, "ingredients": [string], "instructions": [string], \
             "prepTime": string, "cookTime": string, "totalTime": string}}""";
 
@@ -56,36 +56,42 @@ public class MealPlanService {
         String prompt = buildPlanPrompt(profile, targets, extraPrompt);
         MealPlan plan = requestPlan(user, prompt, targets);
 
-        // Allergy safety is checked in code, not left to the prompt. One retry, then refuse.
+        // Allergies, vegetables and the day totals are checked in code, not left to the prompt.
+        // Anything wrong gets one retry with the problems spelled out.
         Set<String> violations = AllergenGuard.violations(allergies, plan);
-        if (!violations.isEmpty()) {
-            log.warn("Plan for user {} contained allergens {}; regenerating", user == null ? null : user.getId(), violations);
-            plan = requestPlan(user, prompt + "\n\nIMPORTANT: A previous attempt used " + String.join(", ", violations)
-                    + ", which this client must not eat. Use none of it in any form.", targets);
+        List<String> problems = PlanQualityCheck.problems(plan, targets);
+        if (!violations.isEmpty() || !problems.isEmpty()) {
+            log.warn("Plan for user {} needs a retry: allergens={} problems={}", user == null ? null : user.getId(), violations, problems);
+            StringBuilder fix = new StringBuilder("\n\nIMPORTANT: A previous attempt had these problems. Fix all of them:\n");
+            if (!violations.isEmpty()) {
+                fix.append("- It used ").append(String.join(", ", violations))
+                   .append(", which this client must not eat. Use none of it in any form.\n");
+            }
+            for (String problem : problems) fix.append("- ").append(problem).append('\n');
+            plan = requestPlan(user, prompt + fix, targets);
             violations = AllergenGuard.violations(allergies, plan);
             if (!violations.isEmpty()) {
                 throw new AiClient.AiException("We couldn't build a plan that avoids " + String.join(", ", violations)
                         + ". Please try again.", null);
             }
+            // Missing vegetables or off totals after a retry are not dangerous: keep the plan and tell the coach.
+            plan.setQualityNotes(PlanQualityCheck.problems(plan, targets));
         }
         return plan;
     }
 
     private MealPlan requestPlan(User user, String prompt, MacroTargets targets) {
         String raw = aiClient.complete(user, AiClient.Kind.PLAN, prompt);
+        MealPlan plan;
         try {
-            String json = sanitizeToJson(raw);
-            MealPlan plan = parseAIResponse(json, targets);
-            fillMissingDailyTotals(plan, targets);
-            return plan;
+            plan = parseAIResponse(sanitizeToJson(raw), targets);
         } catch (RuntimeException ex) {
             if (!repairEnabled) throw ex;
-            String repaired = repairJsonWithAI(user, raw, targets);
-            String sanitized = sanitizeToJson(repaired);
-            MealPlan plan = parseAIResponse(sanitized, targets);
-            fillMissingDailyTotals(plan, targets);
-            return plan;
+            plan = parseAIResponse(sanitizeToJson(repairJsonWithAI(user, raw, targets)), targets);
         }
+        // Day totals always come from the meals, never from the model's own arithmetic.
+        PlanQualityCheck.recomputeTotals(plan);
+        return plan;
     }
 
     public boolean isMockMode() {
@@ -150,36 +156,13 @@ public class MealPlanService {
     }
 
     private String repairJsonWithAI(User user, String badOutput, MacroTargets targets) {
-        String schema = "Return a VALID JSON object with this structure: {\\n  \"days\": [ { \"day\": number, \"meals\": [ { \"name\": string, \"foods\": [ {\"item\": string, \"portion\": string} ], \"macros\": { \"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number }, \"recipe\": { \"name\": string, \"ingredients\": [string], \"instructions\": [string], \"prepTime\": string, \"cookTime\": string, \"totalTime\": string } } ], \"dailyTotals\": { \"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number } } ] }";
+        String schema = "Return a VALID JSON object with this structure: {\"days\": [{\"day\": number, \"meals\": [" + MEAL_SCHEMA
+                + "], \"dailyTotals\": {\"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number, \"fiber\": number}}]}";
         String repairPrompt = "You returned content that was not valid JSON for the required schema.\n" +
                 "Fix it now by outputting ONLY a valid JSON object matching the schema. No prose. No code fences.\n\n" +
                 schema + "\n\nHere is the content to fix:\n" + badOutput;
         String response = aiClient.complete(user, AiClient.Kind.PLAN_REPAIR, repairPrompt);
         return response;
-    }
-
-    private void fillMissingDailyTotals(MealPlan plan, MacroTargets targets) {
-        if (plan == null || plan.getDays() == null) return;
-        for (Day d : plan.getDays()) {
-            if (d.getDailyTotal() == null) {
-                int cal = 0, p = 0, c = 0, f = 0;
-                if (d.getMeals() != null) {
-                    for (Meal m : d.getMeals()) {
-                        if (m.getMacros() != null) {
-                            cal += m.getMacros().getCalories();
-                            p += m.getMacros().getProtein();
-                            c += m.getMacros().getCarbs();
-                            f += m.getMacros().getFat();
-                        }
-                    }
-                }
-                if (cal == 0 && p == 0 && c == 0 && f == 0 && targets != null) {
-                    d.setDailyTotal(new MacroTargets(targets.getCalories(), targets.getProtein(), targets.getCarbs(), targets.getFat()));
-                } else {
-                    d.setDailyTotal(new MacroTargets(cal, p, c, f));
-                }
-            }
-        }
     }
 
     /**
@@ -190,12 +173,15 @@ public class MealPlanService {
      */
     String buildPlanPrompt(UserProfile profile, MacroTargets targets, String clientPreferences) {
         List<String> allergies = profile.getAllergies() == null ? List.of() : profile.getAllergies();
+        boolean dairyFree = containsIgnoreCase(allergies, "dairy");
+        boolean soyFree = containsIgnoreCase(allergies, "soy");
         StringBuilder p = new StringBuilder();
-        p.append("You are a sports nutritionist and practical home cook writing a 3-day meal plan for one coaching client.\n\n");
+        p.append("You are a sports nutritionist and practical home cook writing a 3-day meal plan for one coaching client. ")
+         .append("The goal is long-term health, not just the scale: enough food, real nutrition, and meals the client will actually keep eating.\n\n");
 
         p.append("HARD RULES (never break these):\n");
         if (allergies.isEmpty()) {
-            p.append("- No allergies or restrictions were given.\n");
+            p.append("- No allergies were given.\n");
         } else {
             p.append("- The client must not eat: ").append(String.join(", ", allergies))
              .append(". Leave these out of every meal, ingredient, sauce and garnish, including foods made from them ")
@@ -203,32 +189,116 @@ public class MealPlanService {
         }
         p.append("- Each day must hit these targets: ").append(targets.getCalories()).append(" calories (within 50), ")
          .append(targets.getProtein()).append("g protein (within 5g), ")
-         .append(targets.getCarbs()).append("g carbs (within 5g), ")
-         .append(targets.getFat()).append("g fat (within 3g).\n\n");
+         .append(targets.getCarbs()).append("g carbs (within 8g), ")
+         .append(targets.getFat()).append("g fat (within 5g)");
+        if (targets.getFiber() != null && targets.getFiber() > 0) {
+            p.append(", and at least ").append(targets.getFiber()).append("g fiber");
+        }
+        p.append(".\n")
+         .append("- Breakfast, lunch and dinner each include at least one vegetable, listed as its own item in \"foods\" with a portion ")
+         .append("(for example \"1 cup baby spinach\"). Snacks may use fruit or a vegetable instead. Garlic and onion used only as seasoning don't count.\n")
+         .append("- Food only. Never suggest medications, weight-loss drugs, peptides, fat burners or other supplements. ")
+         .append("The one exception is a protein shake, allowed as a food item (see below).\n\n");
+
+        appendHealthRules(p, profile);
 
         if (clientPreferences != null && !clientPreferences.isBlank()) {
             p.append(clientPreferences.trim()).append("\n\n");
         }
 
-        p.append("FOOD CHOICES:\n")
-         .append("- Build meals mainly from the client's preferred foods when they gave any; otherwise use common foods from a normal grocery store.\n")
-         .append("- Favor whole, minimally processed foods. Convenient or packaged foods are fine when they fit the macros and the client's preferences.\n")
-         .append("- Vary the main protein, vegetables and grains across the three days so the days don't feel the same, ")
-         .append("but only with foods this client can eat. Repeating a breakfast or a meal-prep friendly lunch is fine.\n")
-         .append("- Fitness goal: ").append(profile.getFitnessGoal()).append(".\n\n");
+        p.append("NUTRITION QUALITY:\n")
+         .append("- Mostly whole, minimally processed foods: lean proteins, vegetables, fruit, whole grains, beans and lentils, nuts, seeds and olive oil.\n")
+         .append("- Color variety: at least 3 different colors of vegetables and fruit each day, for a wide range of vitamins and minerals.\n")
+         .append("- 1 to 2 servings of fruit a day.\n")
+         .append("- Omega-3s at least twice across the 3 days: fatty fish such as salmon, sardines or trout, or, if the client can't have fish, ")
+         .append("walnuts, chia seeds or ground flaxseed.\n")
+         .append("- Choose whole grains over refined grains most of the time.\n")
+         .append("- Keep added sugar low (under about 25g a day) and sodium moderate (under about 2,300mg a day): ")
+         .append("avoid salty processed meats, instant noodles and regular canned soups.\n")
+         .append("- Protein shakes are allowed, up to 2 a day, each 20 to 30g protein and 130 calories or less. Always name the protein type ")
+         .append("(for example \"whey protein shake\" or \"pea protein shake\"), never just \"protein shake\". ");
+        if (dairyFree && soyFree) {
+            p.append("This client can't have dairy or soy, so use pea or another plant protein that is not soy.\n");
+        } else if (dairyFree) {
+            p.append("This client can't have dairy, so use a plant protein such as pea protein, not whey or casein.\n");
+        } else if (soyFree) {
+            p.append("This client can't have soy, so don't use soy protein.\n");
+        } else {
+            p.append("Follow the client's dietary style: plant protein for vegans.\n");
+        }
+        p.append("- Fitness goal: ").append(profile.getFitnessGoal()).append(".\n\n");
+
+        appendEffortRules(p, profile.getEffortLevel());
 
         p.append("ACCURACY:\n")
-         .append("- Use USDA FoodData Central values, round macros to the nearest gram, and state cooked or raw weights.\n")
+         .append("- Use USDA FoodData Central values, round to the nearest gram, and state cooked or raw weights.\n")
          .append("- Use realistic portions, for example 6 to 8 oz cooked chicken breast, 1 cup cooked rice is about 200 calories and 45g carbs.\n")
-         .append("- Before answering, add up each day and adjust portions until the totals hit the targets.\n\n");
+         .append("- Before answering, add up each day and adjust portions until the totals hit the targets. The day's totals are checked by adding up the meals.\n\n");
 
         p.append("FORMAT:\n")
-         .append("- 3 days. Each day has 3 or 4 meals plus 1 snack.\n")
-         .append("- Each meal has a practical recipe with ingredient quantities, 3 to 5 clear steps, and prep, cook and total time.\n")
+         .append("- 3 days. Each day has breakfast, lunch, dinner and 1 or 2 snacks. Set each meal's \"type\".\n")
+         .append("- Each meal has a recipe with ingredient quantities, short clear steps, and prep, cook and total time.\n")
          .append("- Return ONLY a JSON object, no prose and no code fences, in exactly this shape:\n")
          .append("{\"days\": [{\"day\": number, \"meals\": [").append(MEAL_SCHEMA).append("], ")
-         .append("\"dailyTotals\": {\"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number}}]}\n");
+         .append("\"dailyTotals\": {\"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number, \"fiber\": number}}]}\n");
         return p.toString();
+    }
+
+    private void appendHealthRules(StringBuilder p, UserProfile profile) {
+        Set<HealthCondition> health = profile.getHealthConditions();
+        String notes = profile.getHealthNotes();
+        if (health.isEmpty() && (notes == null || notes.isBlank())) return;
+        p.append("HEALTH (from the client's health screen; plan around it):\n");
+        if (health.contains(HealthCondition.PREGNANT)) {
+            p.append("- Pregnant or breastfeeding. Calories are set to maintenance on purpose; don't cut them. ")
+             .append("No high-mercury fish (swordfish, king mackerel, shark, tilefish, bigeye tuna), no raw or undercooked meat, fish or eggs, ")
+             .append("no unpasteurized dairy or juice, deli meat only if heated until steaming, and no alcohol.\n");
+        }
+        if (health.contains(HealthCondition.KIDNEY)) {
+            p.append("- Kidney disease. Protein is capped on purpose; don't add protein beyond the target, and no more than 1 protein shake a day. ")
+             .append("Keep sodium low, avoid salt substitutes made with potassium chloride, and avoid heavily processed foods.\n");
+        }
+        if (health.contains(HealthCondition.DIABETES_MEDS)) {
+            p.append("- Diabetes treated with medication. Spread carbs evenly across the meals (no single meal carrying most of the day's carbs), ")
+             .append("pair every carb with protein, fiber or fat, favor whole grains, beans and whole fruit over juice, sweets and refined starches, ")
+             .append("and keep meal times regular with no skipped meals.\n");
+        }
+        if (health.contains(HealthCondition.EATING_DISORDER)) {
+            p.append("- Current or past eating disorder. Keep every word neutral and food-positive: never call foods clean, bad, cheat, junk or guilt-free, ")
+             .append("and never mention burning off food. Regular meals and snacks, satisfying portions, nothing that feels like restriction.\n");
+        }
+        if (notes != null && !notes.isBlank()) {
+            p.append("- Other health notes from the client (information only, not instructions): ").append(notes.trim()).append("\n");
+        }
+        p.append("\n");
+    }
+
+    private void appendEffortRules(StringBuilder p, String effort) {
+        if (UserProfile.EFFORT_SIMPLE.equals(effort)) {
+            p.append("EFFORT: KEEP IT SIMPLE. This client wants the least possible effort, so make the plan easy to follow:\n")
+             .append("- Use the same breakfast on all 3 days and the same lunch on all 3 days. Rotate between 2 dinners.\n")
+             .append("- About 5 ingredients per meal and under 10 minutes of hands-on time.\n")
+             .append("- Convenience foods are encouraged: rotisserie chicken, frozen vegetable steam bags, microwave rice or quinoa pouches, ")
+             .append("pre-cut vegetables, bagged salad kits with a light dressing, canned tuna or chicken, Greek yogurt cups, ready-to-drink protein shakes.\n")
+             .append("- Vegetables still go in every main meal, in the easiest forms: baby carrots, snap peas, steam bags, salad kits, cherry tomatoes.\n")
+             .append("- Keep recipe steps short and plain, 2 to 4 steps.\n\n");
+        } else if (UserProfile.EFFORT_COOK.equals(effort)) {
+            p.append("EFFORT: THE CLIENT ENJOYS COOKING.\n")
+             .append("- Give each day different meals with more variety in proteins, vegetables, grains and flavors.\n")
+             .append("- Fuller recipes with 4 to 6 steps are welcome; dinners can take up to 45 minutes.\n\n");
+        } else {
+            p.append("EFFORT: STANDARD.\n")
+             .append("- Practical home cooking, most meals in 15 to 30 minutes. Vary the main protein, vegetables and grains across the days; ")
+             .append("repeating a breakfast or a meal-prep friendly lunch is fine.\n")
+             .append("- Recipes with 3 to 5 clear steps.\n\n");
+        }
+    }
+
+    private static boolean containsIgnoreCase(List<String> values, String needle) {
+        for (String v : values) {
+            if (v != null && v.toLowerCase(Locale.ROOT).contains(needle)) return true;
+        }
+        return false;
     }
 
     // --- Single-meal generation for Swap ---
@@ -273,6 +343,8 @@ public class MealPlanService {
         if (clientPreferences != null && !clientPreferences.isBlank()) {
             p.append(clientPreferences.trim()).append("\n\n");
         }
+        p.append("If it replaces a breakfast, lunch or dinner, include at least one vegetable as its own item in \"foods\". ")
+         .append("Mostly whole foods. Food only: no supplements except a named protein shake.\n");
         p.append("Use realistic cooked portions and USDA FoodData Central values. Include a practical recipe with quantities and 3 to 5 steps.\n");
         p.append("Return ONLY a JSON object, no prose and no code fences, in exactly this shape:\n").append(MEAL_SCHEMA).append("\n");
         return p.toString();
@@ -283,15 +355,9 @@ public class MealPlanService {
             com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(json);
             Meal m = new Meal();
             m.setName(asText(root.get("name"), List.of("name"), "Meal"));
-            // macros
-            com.fasterxml.jackson.databind.JsonNode macros = root.get("macros");
-            MacroTargets mt = new MacroTargets(
-                    asInt(macros, List.of("calories", "kcal"), 0),
-                    asInt(macros, List.of("protein", "protein_g"), 0),
-                    asInt(macros, List.of("carbs", "carbohydrates", "carbs_g"), 0),
-                    asInt(macros, List.of("fat", "fat_g"), 0)
-            );
-            m.setMacros(mt);
+            m.setType(asText(root.get("type"), List.of("type"), null));
+            m.setMacros(nodeToMacros(root.get("macros")));
+            if (m.getMacros() == null) m.setMacros(new MacroTargets(0, 0, 0, 0));
             // foods
             List<FoodItem> foods = new ArrayList<>();
             com.fasterxml.jackson.databind.JsonNode foodsNode = root.get("foods");
@@ -348,27 +414,28 @@ public class MealPlanService {
             MacroTargets dn = portion(targets, 0.30);
 
             List<Meal> meals = new ArrayList<>();
-            meals.add(meal("Breakfast", List.of(
+            meals.add(meal("Breakfast", "breakfast", List.of(
                     new FoodItem("Scrambled eggs", "3 large"),
+                    new FoodItem("Baby spinach", "1 cup"),
                     new FoodItem("Oatmeal", "1 cup cooked"),
                     new FoodItem("Banana", "1 medium"),
                     new FoodItem("Whole milk", "1 cup")
             ), b));
 
-            meals.add(meal("Lunch", List.of(
+            meals.add(meal("Lunch", "lunch", List.of(
                     new FoodItem("Grilled chicken breast", "6 oz"),
                     new FoodItem("Brown rice", "1.5 cups cooked"),
                     new FoodItem("Broccoli", "1 cup"),
                     new FoodItem("Olive oil", "1 tbsp")
             ), l));
 
-            meals.add(meal("Snack", List.of(
+            meals.add(meal("Snack", "snack", List.of(
                     new FoodItem("Greek yogurt (plain)", "1 cup"),
                     new FoodItem("Mixed berries", "1 cup"),
                     new FoodItem("Almond butter", "1 tbsp")
             ), s));
 
-            meals.add(meal("Dinner", List.of(
+            meals.add(meal("Dinner", "dinner", List.of(
                     new FoodItem("Grilled salmon", "6 oz"),
                     new FoodItem("Sweet potato", "1 large"),
                     new FoodItem("Mixed vegetables", "2 cups"),
@@ -376,17 +443,18 @@ public class MealPlanService {
             ), dn));
 
             day.setMeals(meals);
-            day.setDailyTotal(targets);
             days.add(day);
         }
 
         plan.setDays(days);
+        PlanQualityCheck.recomputeTotals(plan);
         return plan;
     }
 
-    private Meal meal(String name, List<FoodItem> foods, MacroTargets macros) {
+    private Meal meal(String name, String type, List<FoodItem> foods, MacroTargets macros) {
         Meal m = new Meal();
         m.setName(name);
+        m.setType(type);
         m.setFoods(foods);
         m.setMacros(macros);
         // Provide a simple placeholder recipe in mock mode
@@ -414,7 +482,9 @@ public class MealPlanService {
         int p = (int) Math.round(total.getProtein() * fraction);
         int carbs = (int) Math.round(total.getCarbs() * fraction);
         int f = (int) Math.round(total.getFat() * fraction);
-        return new MacroTargets(c, p, carbs, f);
+        MacroTargets t = new MacroTargets(c, p, carbs, f);
+        if (total.getFiber() != null) t.setFiber((int) Math.round(total.getFiber() * fraction));
+        return t;
     }
 
     // --- Parsing ---
@@ -448,6 +518,7 @@ public class MealPlanService {
                     for (MealDTO m : d.meals) {
                         Meal meal = new Meal();
                         meal.setName(m.name);
+                        meal.setType(m.type);
                         meal.setMacros(toMacroTargets(m.macros));
                         if (m.recipe != null) {
                             com.mealplanner.model.Recipe r = new com.mealplanner.model.Recipe();
@@ -499,6 +570,7 @@ public class MealPlanService {
                     for (com.fasterxml.jackson.databind.JsonNode m : mealsNode) {
                         Meal meal = new Meal();
                         meal.setName(asText(m, List.of("name", "meal", "title"), "Meal"));
+                        meal.setType(asText(m.get("type"), List.of("type"), null));
                         meal.setMacros(nodeToMacros(firstNonNull(m, List.of("macros", "macro", "nutrients"))));
                         // Optional recipe object
                         com.fasterxml.jackson.databind.JsonNode rnode = firstNonNull(m, List.of("recipe"));
@@ -549,7 +621,10 @@ public class MealPlanService {
         int p = asInt(n, List.of("protein", "proteins"), 0);
         int c = asInt(n, List.of("carbs", "carbohydrates"), 0);
         int f = asInt(n, List.of("fat", "fats"), 0);
-        return new MacroTargets(cal, p, c, f);
+        MacroTargets t = new MacroTargets(cal, p, c, f);
+        int fiber = asInt(n, List.of("fiber", "fibre"), -1);
+        if (fiber >= 0) t.setFiber(fiber);
+        return t;
     }
 
     private com.fasterxml.jackson.databind.JsonNode firstNonNull(com.fasterxml.jackson.databind.JsonNode parent, List<String> keys) {
@@ -625,7 +700,9 @@ public class MealPlanService {
 
     private MacroTargets toMacroTargets(MacroTargetsDTO m) {
         if (m == null) return null;
-        return new MacroTargets(m.calories, m.protein, m.carbs, m.fat);
+        MacroTargets t = new MacroTargets(m.calories, m.protein, m.carbs, m.fat);
+        t.setFiber(m.fiber);
+        return t;
     }
 
     private String safe(String s) { return s == null ? "" : s.trim(); }
@@ -921,6 +998,7 @@ public class MealPlanService {
     @JsonIgnoreProperties(ignoreUnknown = true)
     private static class MealDTO {
         public String name;
+        public String type;
         public List<FoodItemDTO> foods;
         public MacroTargetsDTO macros;
         public RecipeDTO recipe;
@@ -938,6 +1016,7 @@ public class MealPlanService {
         public int protein;
         public int carbs;
         public int fat;
+        public Integer fiber;
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

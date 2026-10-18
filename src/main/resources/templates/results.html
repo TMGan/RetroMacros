@@ -21,13 +21,51 @@
 <div class="container mb-5">
     <div class="card neon mb-4">
         <div class="card-body">
-            <h5 class="card-title mb-3 section-title">Your Daily Targets</h5>
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h5 class="card-title mb-0 section-title">Your Daily Targets</h5>
+                <span class="badge bg-info text-dark" th:if="${nutrition != null and nutrition.rampWeek != null}"
+                      th:text="'Easing in: week ' + ${nutrition.rampWeek} + ' of 4'">Easing in: week 1 of 4</span>
+            </div>
             <div class="row text-center">
                 <div class="col-6 col-md-3"><div><strong>Calories</strong></div><div th:text="${targets.calories}">2100</div></div>
                 <div class="col-6 col-md-3"><div><strong>Protein</strong></div><div th:text="${targets.protein + ' g'}">158 g</div></div>
                 <div class="col-6 col-md-3 mt-2 mt-md-0"><div><strong>Carbs</strong></div><div th:text="${targets.carbs + ' g'}">210 g</div></div>
                 <div class="col-6 col-md-3 mt-2 mt-md-0"><div><strong>Fat</strong></div><div th:text="${targets.fat + ' g'}">70 g</div></div>
             </div>
+            <div class="row text-center mt-3" th:if="${nutrition != null}">
+                <div class="col-6"><div><strong>Fiber</strong></div><div th:text="'at least ' + ${nutrition.fiber} + ' g'">30 g</div></div>
+                <div class="col-6"><div><strong>Water</strong></div><div th:text="'about ' + ${nutrition.waterOz} + ' oz'">90 oz</div>
+                    <small class="text-muted">plus 12 to 16 oz on training days</small></div>
+            </div>
+            <p class="text-muted small mt-3 mb-0" th:if="${nutrition != null and nutrition.rampWeek != null and nutrition.rampWeek < 4}">
+                These are this week's targets. Each week they step a little closer to your full plan. Make a new plan when the next week starts.
+            </p>
+            <p class="text-muted small mt-3 mb-0" th:if="${nutrition != null and nutrition.floorApplied}">
+                Your calories are set to a safe minimum, so you're never eating less than your body needs at rest.
+            </p>
+        </div>
+    </div>
+
+    <div class="alert alert-warning" th:if="${nutrition != null and nutrition.healthHold}">
+        <strong>Your plan is set to maintenance calories for now.</strong>
+        Because of your health check answers, your coach will review your plan with you before setting a calorie goal.
+        Please also check with your doctor before changing how you eat.
+    </div>
+
+    <div class="card neon mb-4" th:if="${nutrition != null}">
+        <div class="card-body">
+            <h6 class="section-title mb-2"><i class="bi bi-capsule"></i> Supplement note: creatine</h6>
+            <p class="mb-2" th:if="${!nutrition.creatineNeedsDoctor}">
+                Creatine monohydrate, 3 to 5 g a day, is one of the most studied supplements there is. It supports strength,
+                muscle and recovery, and it's safe for healthy adults. Mix it into water or a shake at any time of day.
+            </p>
+            <p class="mb-2" th:if="${nutrition.creatineNeedsDoctor}">
+                Creatine (3 to 5 g a day) is safe for most healthy adults, but based on your health check, <strong>talk to your doctor before starting it</strong>.
+            </p>
+            <p class="text-muted small mb-0">
+                Heads up: creatine pulls water into your muscles, so the scale often goes up 2 to 4 lb in the first couple of weeks.
+                That's water, not fat. Keep your water intake up.
+            </p>
         </div>
     </div>
 
@@ -43,6 +81,8 @@
                 <span class="badge macro-badge protein me-2" th:text="${'P ' + day.dailyTotal.protein + 'g (' + T(java.lang.Math).round(pPct) + '%)'}">P 160g (30%)</span>
                 <span class="badge macro-badge carb me-2" th:text="${'C ' + day.dailyTotal.carbs + 'g (' + T(java.lang.Math).round(cPct) + '%)'}">C 210g (40%)</span>
                 <span class="badge macro-badge fat" th:text="${'F ' + day.dailyTotal.fat + 'g (' + T(java.lang.Math).round(fPct) + '%)'}">F 70g (30%)</span>
+                <span class="badge bg-success ms-2" th:if="${day.dailyTotal.fiber != null}" th:text="${'Fiber ' + day.dailyTotal.fiber + 'g'}">Fiber 32g</span>
+                <span class="text-muted small ms-2" th:text="${day.dailyTotal.calories + ' cal'}">2000 cal</span>
             </div>
             <div class="macro-stack">
                 <div class="macro-seg protein" th:style="${'width:' + T(java.lang.Math).max(0.0, T(java.lang.Math).min(100.0, pPct)) + '%'}"></div>

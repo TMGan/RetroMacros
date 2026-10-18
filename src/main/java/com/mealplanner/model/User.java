@@ -45,6 +45,35 @@ public class User {
     @Column(name = "body_diagram", length = 10)
     private String bodyDiagram;
 
+    // Health-screen answers (HealthCondition keys, comma separated) and free-text notes.
+    @Column(name = "health_conditions", length = 200)
+    private String healthConditions;
+    @Column(name = "health_notes", length = 300)
+    private String healthNotes;
+    // Set by the coach once a doctor has cleared a flagged client for normal targets.
+    @Column(name = "health_cleared")
+    private Boolean healthCleared;
+
+    // When the client agreed to the disclaimer. Null until they do.
+    @Column(name = "disclaimer_accepted_at")
+    private LocalDateTime disclaimerAcceptedAt;
+
+    // First day of the client's current 4-week ramp, or null when not ramping.
+    @Column(name = "ramp_start_date")
+    private java.time.LocalDate rampStartDate;
+
+    public String getHealthConditions() { return healthConditions; }
+    public void setHealthConditions(String healthConditions) { this.healthConditions = healthConditions; }
+    public String getHealthNotes() { return healthNotes; }
+    public void setHealthNotes(String healthNotes) { this.healthNotes = healthNotes; }
+    public boolean isHealthCleared() { return Boolean.TRUE.equals(healthCleared); }
+    public void setHealthCleared(Boolean healthCleared) { this.healthCleared = healthCleared; }
+    public boolean hasHealthFlags() { return healthConditions != null && !healthConditions.isBlank(); }
+    public LocalDateTime getDisclaimerAcceptedAt() { return disclaimerAcceptedAt; }
+    public void setDisclaimerAcceptedAt(LocalDateTime disclaimerAcceptedAt) { this.disclaimerAcceptedAt = disclaimerAcceptedAt; }
+    public java.time.LocalDate getRampStartDate() { return rampStartDate; }
+    public void setRampStartDate(java.time.LocalDate rampStartDate) { this.rampStartDate = rampStartDate; }
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<SavedMealPlan> savedMealPlans = new ArrayList<>();
 

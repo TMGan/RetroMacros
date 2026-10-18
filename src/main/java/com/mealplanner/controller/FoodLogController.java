@@ -198,57 +198,13 @@ public class FoodLogController {
             return ResponseEntity.ok(response);
         } catch (AiQuotaService.QuotaExceededException e) {
             return quotaResponse(e);
+        } catch (com.mealplanner.service.AiClient.AiException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("error", "Error generating suggestion.");
-            return ResponseEntity.status(500).body(response);
-        }
-    }
-
-    @PostMapping("/estimate-with-alternative")
-    @ResponseBody
-    public ResponseEntity<Map<String, Object>> estimateWithAlternative(
-            @AuthenticationPrincipal OAuth2User principal,
-            @RequestParam String foodDescription) {
-        User user = currentUserService.require(principal);
-        Map<String, Object> response = new HashMap<>();
-        try {
-            // Check the input before charging it against the daily AI limit.
-            if (!isUsableDescription(foodDescription)) {
-                response.put("success", false);
-                response.put("error", "Please enter a valid food description.");
-                return ResponseEntity.ok(response);
-            }
-            boolean offline = currentUserService.isDemo(user);
-            if (!offline) aiQuotaService.consume(user, AiQuotaService.Kind.ESTIMATE);
-            Map<String, Integer> macros = foodLogService.estimateMacrosWithAI(user, foodDescription, offline);
-            if (macros == null) {
-                response.put("success", false);
-                response.put("error", "Please enter a valid food description.");
-                return ResponseEntity.ok(response);
-            }
-            response.put("success", true);
-            response.put("calories", macros.get("calories"));
-            response.put("protein", macros.get("protein"));
-            response.put("carbs", macros.get("carbs"));
-            response.put("fat", macros.get("fat"));
-            String healthier = offline ? null : foodLogService.suggestHealthierAlternative(
-                    user,
-                    foodDescription,
-                    macros.get("calories"),
-                    macros.get("protein"),
-                    macros.get("carbs"),
-                    macros.get("fat")
-            );
-            if (healthier != null && !healthier.isBlank()) {
-                response.put("healthierAlternative", healthier);
-            }
-            return ResponseEntity.ok(response);
-        } catch (AiQuotaService.QuotaExceededException e) {
-            return quotaResponse(e);
-        } catch (Exception e) {
-            response.put("success", false);
-            response.put("error", "Could not estimate macros.");
             return ResponseEntity.status(500).body(response);
         }
     }
@@ -299,6 +255,10 @@ public class FoodLogController {
             return ResponseEntity.ok(response);
         } catch (AiQuotaService.QuotaExceededException e) {
             return quotaResponse(e);
+        } catch (com.mealplanner.service.AiClient.AiException e) {
+            response.put("success", false);
+            response.put("error", e.getMessage());
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             response.put("success", false);
             response.put("error", "Couldn't estimate macros. Please enter them manually.");

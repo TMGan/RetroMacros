@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Disclaimer - Retro Macros</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Audiowide&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/theme.css}" />
+</head>
+<body class="neon">
+<div th:replace="${user != null} ? ~{fragments/navbar :: authenticated-navbar} : ~{fragments/navbar :: public-navbar}"></div>
+
+<div class="container my-5">
+    <div class="row">
+        <div class="col-lg-8 mx-auto">
+            <h1 class="mb-4 section-title">Disclaimer</h1>
+
+            <div class="card neon mb-4"><div class="card-body">
+                <h5 class="section-title">Not medical advice</h5>
+                <p>Retro Macros gives general nutrition and fitness information for healthy adults. It is not medical advice and
+                    does not replace a doctor, registered dietitian or other licensed health professional. It does not diagnose,
+                    treat or prevent any disease or condition.</p>
+
+                <h5 class="section-title mt-4">Talk to your doctor first</h5>
+                <p>Check with your doctor before changing how you eat, starting an exercise program, or taking any supplement,
+                    including creatine or protein powder. This matters most if you are pregnant or breastfeeding, have a medical
+                    condition (such as kidney disease, diabetes or heart disease), take medication, or have a history of an
+                    eating disorder.</p>
+
+                <h5 class="section-title mt-4">How plans are made</h5>
+                <p>Calorie and macro targets are estimates from standard formulas. Meal plans and macro numbers are written with the
+                    help of AI and may contain mistakes, including in nutrition values and ingredients. Always read labels and check
+                    ingredients yourself, especially for allergies. You are responsible for what you choose to eat.</p>
+
+                <h5 class="section-title mt-4">Results vary</h5>
+                <p>Everyone's body is different. Progress depends on many things, and no particular result is promised.</p>
+
+                <h5 class="section-title mt-4">Stop and get help</h5>
+                <p class="mb-0">If you feel unwell, dizzy, faint or have chest pain while following a plan or exercising, stop and
+                    contact a doctor. In an emergency, call 911 or your local emergency number.</p>
+            </div></div>
+
+            <p class="text-muted small">By using Retro Macros you agree that you use it at your own risk and that Retro Macros and its coach
+                are not liable for any injury, illness or loss that results from following its information.</p>
+        </div>
+    </div>
+</div>
+
+<script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+</body>
+</html>

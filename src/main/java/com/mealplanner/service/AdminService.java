@@ -27,6 +27,7 @@ public class AdminService {
     private final ProgressService progressService;
     private final com.mealplanner.repository.BodyCheckInRepository checkInRepository;
     private final com.mealplanner.repository.MeasurementEntryRepository measurementRepository;
+    private final AiClient aiClient;
 
     public AdminService(UserRepository userRepository,
                         SavedMealPlanRepository savedMealPlanRepository,
@@ -38,7 +39,9 @@ public class AdminService {
                         com.mealplanner.repository.AiCallLogRepository aiCallLogRepository,
                         ProgressService progressService,
                         com.mealplanner.repository.BodyCheckInRepository checkInRepository,
-                        com.mealplanner.repository.MeasurementEntryRepository measurementRepository) {
+                        com.mealplanner.repository.MeasurementEntryRepository measurementRepository,
+                        AiClient aiClient) {
+        this.aiClient = aiClient;
         this.measurementRepository = measurementRepository;
         this.progressService = progressService;
         this.checkInRepository = checkInRepository;
@@ -73,6 +76,11 @@ public class AdminService {
         LocalDateTime monthStart = LocalDate.now().withDayOfMonth(1).atStartOfDay();
         stats.put("aiCostThisMonth", dollars(aiCallLogRepository.sumCostMicrosSince(monthStart)));
         stats.put("aiCostAllTime", dollars(aiCallLogRepository.sumCostMicros()));
+        long last30 = aiCallLogRepository.sumCostMicrosSince(LocalDateTime.now().minusDays(30));
+        stats.put("aiCost30d", dollars(last30));
+        stats.put("aiBudget30d", String.format(java.util.Locale.US, "%.2f", aiClient.globalBudgetUsd()));
+        stats.put("aiBudgetUsedPct", (int) Math.min(100, Math.round(last30 / (aiClient.globalBudgetUsd() * 10_000))));
+        stats.put("aiUserBudget", String.format(java.util.Locale.US, "%.2f", aiClient.userBudgetUsd()));
 
         Double avgAccuracy = null;
         try { avgAccuracy = savedMealPlanRepository.getAverageAccuracyScore(); } catch (Exception ignore) {}

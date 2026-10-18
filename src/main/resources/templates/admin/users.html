@@ -47,6 +47,7 @@
                         <td>
                             <span th:if="${userStat.lastCheckIn != null}" th:text="${#temporals.format(userStat.lastCheckIn, 'MMM d')}">date</span>
                             <span th:if="${userStat.missedCheckIn and !u.admin}" class="badge text-bg-warning ms-1">Missed</span>
+                            <span th:if="${u.hasHealthFlags() and !u.healthCleared}" class="badge text-bg-danger ms-1">Health review</span>
                         </td>
                         <td>
                             <span th:if="${userStat.lastActive != null}" th:text="${#temporals.format(userStat.lastActive, 'MMM d, yyyy')}">date</span>

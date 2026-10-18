@@ -45,4 +45,36 @@ class AiClientTest {
                 .isInstanceOf(AiClient.AiException.class)
                 .hasMessageContaining("not configured");
     }
+
+    private static com.mealplanner.model.User client(boolean admin) {
+        com.mealplanner.model.User u = new com.mealplanner.model.User("c@example.com", "Client", "g-1");
+        u.setAdmin(admin);
+        return u;
+    }
+
+    @Test
+    void stopsAClientOverTheirSpendCapBeforeCalling() {
+        com.mealplanner.repository.AiCallLogRepository repo = org.mockito.Mockito.mock(com.mealplanner.repository.AiCallLogRepository.class);
+        org.mockito.Mockito.when(repo.sumCostMicrosSince(org.mockito.ArgumentMatchers.any())).thenReturn(0L);
+        org.mockito.Mockito.when(repo.sumCostMicrosForUserSince(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.any()))
+                .thenReturn(4_000_000L);
+        AiClient ai = new AiClient(repo, new MockEnvironment().withProperty("ai.budget.user-30d-usd", "4.00"),
+                "test-key", 1000, "claude-sonnet-5-5", "claude-haiku-5-5", "low", "low");
+
+        assertThatThrownBy(() -> ai.complete(client(false), AiClient.Kind.PLAN, "plan"))
+                .isInstanceOf(AiClient.AiException.class)
+                .hasMessageContaining("AI allowance");
+    }
+
+    @Test
+    void stopsEveryoneOverTheGlobalCap() {
+        com.mealplanner.repository.AiCallLogRepository repo = org.mockito.Mockito.mock(com.mealplanner.repository.AiCallLogRepository.class);
+        org.mockito.Mockito.when(repo.sumCostMicrosSince(org.mockito.ArgumentMatchers.any())).thenReturn(150_000_000L);
+        AiClient ai = new AiClient(repo, new MockEnvironment(), "test-key", 1000, "claude-sonnet-5-5", "claude-haiku-5-5", "low", "low");
+
+        // The coach is exempt from the per-client cap, but not from the global one.
+        assertThatThrownBy(() -> ai.complete(client(true), AiClient.Kind.PLAN, "plan"))
+                .isInstanceOf(AiClient.AiException.class)
+                .hasMessageContaining("paused");
+    }
 }

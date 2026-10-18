@@ -23,7 +23,7 @@ public class WebConfig implements WebMvcConfigurer {
     public void addInterceptors(InterceptorRegistry registry) {
         // Runs first so a removed client or admin is stopped before anything else.
         registry.addInterceptor(accessCheckInterceptor)
-                .excludePathPatterns("/css/**", "/js/**", "/images/**", "/webjars/**", "/login", "/error", "/home", "/about", "/demo-login");
+                .excludePathPatterns("/css/**", "/js/**", "/images/**", "/webjars/**", "/login", "/error", "/home", "/about", "/disclaimer", "/demo-login");
         registry.addInterceptor(adminInterceptor).addPathPatterns("/admin", "/admin/**");
         registry.addInterceptor(readOnlyViewInterceptor).excludePathPatterns("/admin", "/admin/**");
     }

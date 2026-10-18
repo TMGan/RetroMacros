@@ -1,25 +1,22 @@
 package com.mealplanner.controller;
 
-import com.mealplanner.model.*;
-import com.mealplanner.service.MacroCalculatorService;
-import com.mealplanner.repository.UserRepository;
-import com.mealplanner.repository.SavedMealPlanRepository;
-import com.mealplanner.model.SavedMealPlan;
-import com.mealplanner.model.User;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.mealplanner.model.*;
+import com.mealplanner.repository.BodyCheckInRepository;
+import com.mealplanner.repository.SavedMealPlanRepository;
+import com.mealplanner.repository.UserRepository;
+import com.mealplanner.service.*;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
-import com.mealplanner.service.MealPlanService;
-import com.mealplanner.service.AiQuotaService;
-import com.mealplanner.service.CurrentUserService;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Controller
@@ -29,45 +26,52 @@ public class MainController {
     private final MealPlanService mealPlanService;
     private final UserRepository userRepository;
     private final SavedMealPlanRepository savedMealPlanRepository;
-    private final com.mealplanner.service.UserFoodPreferencesService preferencesService;
-    private final com.mealplanner.service.SwapService swapService;
+    private final BodyCheckInRepository checkInRepository;
+    private final UserFoodPreferencesService preferencesService;
+    private final SwapService swapService;
     private final CurrentUserService currentUserService;
     private final AiQuotaService aiQuotaService;
+    private final FoodLogService foodLogService;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MainController.class);
     private static final int MAX_OTHER_ALLERGIES_LENGTH = 200;
+    // Health notes go into the AI prompt, so they are bounded like other client text.
+    private static final int MAX_HEALTH_NOTES_LENGTH = 300;
 
     public MainController(MacroCalculatorService macroService,
                           MealPlanService mealPlanService,
                           UserRepository userRepository,
                           SavedMealPlanRepository savedMealPlanRepository,
-                          com.mealplanner.service.UserFoodPreferencesService preferencesService,
-                          com.mealplanner.service.SwapService swapService,
+                          BodyCheckInRepository checkInRepository,
+                          UserFoodPreferencesService preferencesService,
+                          SwapService swapService,
                           CurrentUserService currentUserService,
-                          AiQuotaService aiQuotaService) {
-        this.currentUserService = currentUserService;
-        this.aiQuotaService = aiQuotaService;
+                          AiQuotaService aiQuotaService,
+                          FoodLogService foodLogService) {
         this.macroService = macroService;
         this.mealPlanService = mealPlanService;
         this.userRepository = userRepository;
         this.savedMealPlanRepository = savedMealPlanRepository;
+        this.checkInRepository = checkInRepository;
         this.preferencesService = preferencesService;
         this.swapService = swapService;
+        this.currentUserService = currentUserService;
+        this.aiQuotaService = aiQuotaService;
+        this.foodLogService = foodLogService;
     }
 
     @GetMapping("/")
     public String root(org.springframework.security.core.Authentication authentication) {
-        if (authentication != null && (authentication.getPrincipal() instanceof org.springframework.security.oauth2.core.user.OAuth2User)) {
+        if (authentication != null && (authentication.getPrincipal() instanceof OAuth2User)) {
             return "redirect:/dashboard";
         }
         return "redirect:/home";
     }
 
     @GetMapping("/form")
-    public String form(Model model) {
-        model.addAttribute("activityLevels", activityLevels());
-        model.addAttribute("goals", goals());
-        model.addAttribute("allergyOptions", allergyOptions());
+    public String form(@AuthenticationPrincipal OAuth2User principal, Model model) {
+        User user = currentUserService.require(principal);
+        addFormModel(model, user, prefillFromHistory(user));
         return "form"; // templates/form.html
     }
 
@@ -83,65 +87,116 @@ public class MainController {
             @RequestParam String fitnessGoal,
             @RequestParam(name = "bmrFormula", required = false, defaultValue = "mifflin-st-jeor") String bmrFormula,
             @RequestParam(name = "bodyFatPercentage", required = false) Double bodyFatPercentage,
+            @RequestParam(name = "macroStyle", required = false, defaultValue = UserProfile.STYLE_BALANCED) String macroStyle,
             @RequestParam(name = "proteinPercent", required = false, defaultValue = "30") int proteinPercent,
             @RequestParam(name = "carbsPercent", required = false, defaultValue = "40") int carbsPercent,
             @RequestParam(name = "fatPercent", required = false, defaultValue = "30") int fatPercent,
+            @RequestParam(name = "effortLevel", required = false, defaultValue = UserProfile.EFFORT_STANDARD) String effortLevel,
+            @RequestParam(name = "ramp", required = false, defaultValue = "false") boolean ramp,
+            @RequestParam(name = "healthConditions", required = false) List<String> healthConditions,
+            @RequestParam(name = "healthNotes", required = false) String healthNotes,
+            @RequestParam(name = "acceptDisclaimer", required = false, defaultValue = "false") boolean acceptDisclaimer,
             @RequestParam(required = false) List<String> allergies,
             @RequestParam(required = false, name = "otherAllergies") String otherAllergies,
             Model model
     ) {
+        User user = currentUserService.require(principal);
+
+        Set<HealthCondition> health = EnumSet.noneOf(HealthCondition.class);
+        if (healthConditions != null) healthConditions.forEach(k -> HealthCondition.fromKey(k).ifPresent(health::add));
+        String notes = bound(healthNotes, MAX_HEALTH_NOTES_LENGTH);
+
+        // What the form shows again if something is wrong.
+        Map<String, Object> submitted = new HashMap<>();
+        submitted.put("weight", weight);
+        submitted.put("heightFeet", heightFeet);
+        submitted.put("heightInches", heightInches);
+        submitted.put("age", age);
+        submitted.put("sex", sex);
+        submitted.put("activityLevel", activityLevel);
+        submitted.put("fitnessGoal", fitnessGoal);
+        submitted.put("bmrFormula", bmrFormula);
+        submitted.put("bodyFat", bodyFatPercentage);
+        submitted.put("macroStyle", macroStyle);
+        submitted.put("proteinPercent", proteinPercent);
+        submitted.put("carbsPercent", carbsPercent);
+        submitted.put("fatPercent", fatPercent);
+        submitted.put("effortLevel", effortLevel);
+        submitted.put("ramp", ramp);
+        submitted.put("healthConditions", health.stream().map(HealthCondition::getKey).toList());
+        submitted.put("healthNotes", notes);
+        submitted.put("allergies", allergies == null ? List.of() : allergies);
+        submitted.put("otherAllergies", otherAllergies);
+
         List<String> errors = validateInputs(weight, heightFeet, heightInches, age, sex, activityLevel, fitnessGoal);
         if (bodyFatPercentage != null && (bodyFatPercentage < 3 || bodyFatPercentage > 70)) {
             errors.add("Body fat must be between 3% and 70%.");
         }
-        if (!errors.isEmpty()) {
-            model.addAttribute("errors", errors);
-            model.addAttribute("activityLevels", activityLevels());
-            model.addAttribute("goals", goals());
-            model.addAttribute("allergyOptions", allergyOptions());
-            return "form";
+        if (!UserProfile.MACRO_STYLES.contains(macroStyle)) errors.add("Pick a macro style.");
+        if (!UserProfile.EFFORT_LEVELS.contains(effortLevel)) errors.add("Pick an effort level.");
+        if (UserProfile.STYLE_CUSTOM.equals(macroStyle)) {
+            if (proteinPercent + carbsPercent + fatPercent != 100) {
+                errors.add("Custom macro percentages must add up to 100%.");
+            } else if (proteinPercent < 20 || proteinPercent > 50 || carbsPercent < 20 || carbsPercent > 60
+                    || fatPercent < 20 || fatPercent > 45) {
+                errors.add("Custom split: protein 20-50%, carbs 20-60%, fat 20-45%.");
+            }
         }
+        if (user.getDisclaimerAcceptedAt() == null && !acceptDisclaimer) {
+            errors.add("Please read and accept the disclaimer before building a plan.");
+        }
+        if (!errors.isEmpty()) return formWithErrors(model, user, submitted, errors);
 
         List<String> allAllergies = new ArrayList<>();
         // Only the known checkbox values; free text goes through the capped "other" box.
         if (allergies != null) allergies.stream().filter(allergyOptions()::contains).distinct().forEach(allAllergies::add);
         if (StringUtils.hasText(otherAllergies)) {
             // Free text ends up in the AI prompt, so bound it.
-            String bounded = otherAllergies.replaceAll("[\\r\\n\\t]+", " ");
-            if (bounded.length() > MAX_OTHER_ALLERGIES_LENGTH) bounded = bounded.substring(0, MAX_OTHER_ALLERGIES_LENGTH);
-            Arrays.stream(bounded.split(","))
+            Arrays.stream(bound(otherAllergies, MAX_OTHER_ALLERGIES_LENGTH).split(","))
                     .map(String::trim)
                     .filter(s -> !s.isBlank())
                     .forEach(allAllergies::add);
         }
 
+        // Remember the health screen. A changed answer needs the coach to clear it again.
+        String healthKeys = HealthCondition.join(health);
+        if (!healthKeys.equals(Objects.toString(user.getHealthConditions(), ""))) user.setHealthCleared(false);
+        user.setHealthConditions(healthKeys.isEmpty() ? null : healthKeys);
+        user.setHealthNotes(notes == null || notes.isBlank() ? null : notes);
+        if (user.getDisclaimerAcceptedAt() == null) user.setDisclaimerAcceptedAt(LocalDateTime.now());
+
+        LocalDate today = foodLogService.today(user);
+        Integer rampWeek = null;
+        if (ramp) {
+            if (user.getRampStartDate() == null) user.setRampStartDate(today);
+            rampWeek = MacroCalculatorService.rampWeek(user.getRampStartDate(), today);
+        } else {
+            user.setRampStartDate(null);
+        }
+        userRepository.save(user);
+
         UserProfile profile = new UserProfile(weight, heightFeet, heightInches, age,
                 sex, activityLevel, fitnessGoal, allAllergies);
+        profile.setBmrFormula(bmrFormula);
+        profile.setBodyFatPercentage(bodyFatPercentage);
+        profile.setGoalWeight(user.getGoalWeightLbs());
+        profile.setMacroStyle(macroStyle);
+        profile.setCustomProteinPercent(proteinPercent);
+        profile.setCustomCarbsPercent(carbsPercent);
+        profile.setCustomFatPercent(fatPercent);
+        profile.setEffortLevel(effortLevel);
+        profile.setHealthConditions(health);
+        profile.setHealthNotes(user.getHealthNotes());
+        profile.setHealthCleared(user.isHealthCleared());
 
-        double bmr;
+        NutritionTargets nutrition;
         try {
-            bmr = macroService.calculateBMRByFormula(bmrFormula, weight, heightFeet, heightInches, age, sex, bodyFatPercentage);
+            nutrition = macroService.buildTargets(profile, rampWeek);
         } catch (IllegalArgumentException iae) {
-            model.addAttribute("errors", java.util.List.of(iae.getMessage()));
-            model.addAttribute("activityLevels", activityLevels());
-            model.addAttribute("goals", goals());
-            model.addAttribute("allergyOptions", allergyOptions());
-            return "form";
+            return formWithErrors(model, user, submitted, List.of(iae.getMessage()));
         }
-        double tdee = macroService.calculateTDEE(bmr, activityLevel);
-        double targetCalories = macroService.adjustForGoal(tdee, fitnessGoal);
-        MacroTargets targets;
-        try {
-            targets = macroService.calculateMacros(targetCalories, proteinPercent, carbsPercent, fatPercent);
-        } catch (IllegalArgumentException iae) {
-            model.addAttribute("errors", java.util.List.of(iae.getMessage()));
-            model.addAttribute("activityLevels", activityLevels());
-            model.addAttribute("goals", goals());
-            model.addAttribute("allergyOptions", allergyOptions());
-            return "form";
-        }
+        MacroTargets targets = nutrition.toMacroTargets();
 
-        User user = currentUserService.require(principal);
         try {
             // Every plan is saved, so cap saves for every account, including the public demo.
             aiQuotaService.consume(user, AiQuotaService.Kind.PLAN_SAVE);
@@ -154,15 +209,10 @@ public class MainController {
                 String preferencesExtra = preferencesService.buildPreferencesPrompt(user);
                 String learnedExtra = swapService.buildLearnedPreferencesPrompt(user);
                 String combinedExtra = (preferencesExtra == null ? "" : preferencesExtra) + "\n" + (learnedExtra == null ? "" : learnedExtra);
-                if (!combinedExtra.isBlank()) {
-                    mealPlan = mealPlanService.generateMealPlan(user, profile, targets, combinedExtra);
-                } else {
-                    mealPlan = mealPlanService.generateMealPlan(user, profile, targets);
-                }
+                mealPlan = mealPlanService.generateMealPlan(user, profile, targets, combinedExtra.isBlank() ? null : combinedExtra);
             }
             GroceryList groceryList = mealPlanService.generateGroceryList(mealPlan);
 
-            // Persist saved plan for the logged-in user
             SavedMealPlan saved = new SavedMealPlan();
             saved.setUser(user);
             saved.setWeight(profile.getWeight());
@@ -177,10 +227,23 @@ public class MainController {
             saved.setTargetCarbs(targets.getCarbs());
             saved.setTargetFat(targets.getFat());
             saved.setAllergies(String.join(", ", allAllergies));
-            try {
-                // Optional: reflect selected formula in saved JSON metadata later if desired
-                // Not persisting formula fields to entity to keep migration simple
-            } catch (Exception ignored) {}
+            saved.setMacroStyle(macroStyle);
+            saved.setEffortLevel(effortLevel);
+            saved.setRampWeek(nutrition.getRampWeek());
+            saved.setFiberTarget(nutrition.getFiber());
+            saved.setWaterOz(nutrition.getWaterOz());
+            saved.setHealthHold(nutrition.isHealthHold());
+            saved.setHealthConditions(healthKeys.isEmpty() ? null : healthKeys);
+            // What the plan really adds up to, so the coach's accuracy numbers are real.
+            MacroTargets actual = PlanQualityCheck.averageDailyTotals(mealPlan);
+            if (actual != null) {
+                saved.setActualCalories(actual.getCalories());
+                saved.setActualProtein(actual.getProtein());
+                saved.setActualCarbs(actual.getCarbs());
+                saved.setActualFat(actual.getFat());
+            }
+            saved.setAccuracyScore(PlanQualityCheck.accuracyScore(mealPlan, targets));
+            if (!mealPlan.getQualityNotes().isEmpty()) saved.setQualityNotes(String.join("\n", mealPlan.getQualityNotes()));
             try {
                 ObjectMapper mapper = new ObjectMapper();
                 saved.setMealPlanJson(mapper.writeValueAsString(mealPlan));
@@ -189,32 +252,86 @@ public class MainController {
             savedMealPlanRepository.save(saved);
 
             model.addAttribute("targets", targets);
+            model.addAttribute("nutrition", nutrition);
             model.addAttribute("mealPlan", mealPlan);
             model.addAttribute("groceryList", groceryList);
             return "results"; // templates/results.html
         } catch (AiQuotaService.QuotaExceededException ex) {
-            model.addAttribute("errors", List.of(ex.getMessage()));
-            model.addAttribute("activityLevels", activityLevels());
-            model.addAttribute("goals", goals());
-            model.addAttribute("allergyOptions", allergyOptions());
-            return "form";
-        } catch (com.mealplanner.service.AiClient.AiException ex) {
-            // These messages are written to be shown to clients (allergy refusals, outages).
+            return formWithErrors(model, user, submitted, List.of(ex.getMessage()));
+        } catch (AiClient.AiException ex) {
+            // These messages are written to be shown to clients (allergy refusals, outages, spend limits).
             log.warn("Meal plan generation failed for user {}: {}", user.getId(), ex.getMessage());
-            model.addAttribute("errors", List.of(ex.getMessage()));
-            model.addAttribute("activityLevels", activityLevels());
-            model.addAttribute("goals", goals());
-            model.addAttribute("allergyOptions", allergyOptions());
-            return "form";
+            return formWithErrors(model, user, submitted, List.of(ex.getMessage()));
         } catch (Exception ex) {
             // Details stay in the server log; they can include raw provider responses.
             log.warn("Meal plan generation failed for user {}", user.getId(), ex);
-            model.addAttribute("errors", List.of("We couldn't generate your meal plan right now. Please try again in a minute."));
-            model.addAttribute("activityLevels", activityLevels());
-            model.addAttribute("goals", goals());
-            model.addAttribute("allergyOptions", allergyOptions());
-            return "form";
+            return formWithErrors(model, user, submitted, List.of("We couldn't generate your meal plan right now. Please try again in a minute."));
         }
+    }
+
+    private String formWithErrors(Model model, User user, Map<String, Object> submitted, List<String> errors) {
+        model.addAttribute("errors", errors);
+        addFormModel(model, user, submitted);
+        return "form";
+    }
+
+    private void addFormModel(Model model, User user, Map<String, Object> prefill) {
+        model.addAttribute("prefill", prefill);
+        model.addAttribute("activityLevels", activityLevels());
+        model.addAttribute("goals", goals());
+        model.addAttribute("allergyOptions", allergyOptions());
+        model.addAttribute("healthOptions", HealthCondition.values());
+        model.addAttribute("needsDisclaimer", user.getDisclaimerAcceptedAt() == null);
+        model.addAttribute("goalWeight", user.getGoalWeightLbs());
+        model.addAttribute("rampWeekNow", MacroCalculatorService.rampWeek(user.getRampStartDate(), foodLogService.today(user)));
+    }
+
+    /** Starts the form from the last plan and the latest weigh-in, so targets follow the client's progress. */
+    private Map<String, Object> prefillFromHistory(User user) {
+        Map<String, Object> p = new HashMap<>();
+        // The template reads every key, and a missing one is an error, so start them all as empty.
+        for (String key : List.of("weight", "heightFeet", "heightInches", "age", "sex", "activityLevel", "fitnessGoal",
+                "bodyFat", "otherAllergies")) {
+            p.put(key, null);
+        }
+        p.put("macroStyle", UserProfile.STYLE_BALANCED);
+        p.put("effortLevel", UserProfile.EFFORT_STANDARD);
+        p.put("proteinPercent", 30);
+        p.put("carbsPercent", 40);
+        p.put("fatPercent", 30);
+        p.put("bmrFormula", "mifflin-st-jeor");
+        p.put("ramp", user.getRampStartDate() != null);
+        p.put("healthConditions", HealthCondition.parse(user.getHealthConditions()).stream().map(HealthCondition::getKey).toList());
+        p.put("healthNotes", user.getHealthNotes());
+        p.put("allergies", List.of());
+
+        List<SavedMealPlan> plans = savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user);
+        if (!plans.isEmpty()) {
+            SavedMealPlan last = plans.get(0);
+            p.put("weight", Math.round(last.getWeight()));
+            p.put("heightFeet", last.getHeightFeet());
+            p.put("heightInches", last.getHeightInches());
+            p.put("age", last.getAge());
+            p.put("sex", last.getSex());
+            p.put("activityLevel", last.getActivityLevel());
+            p.put("fitnessGoal", last.getFitnessGoal());
+            if (last.getMacroStyle() != null) p.put("macroStyle", last.getMacroStyle());
+            if (last.getEffortLevel() != null) p.put("effortLevel", last.getEffortLevel());
+            List<String> known = new ArrayList<>();
+            List<String> other = new ArrayList<>();
+            for (String a : last.getAllergyList()) (allergyOptions().contains(a) ? known : other).add(a);
+            p.put("allergies", known);
+            p.put("otherAllergies", String.join(", ", other));
+        }
+        checkInRepository.findTopByUserOrderByCheckInDateDesc(user)
+                .ifPresent(c -> p.put("weight", Math.round(c.getWeightLbs())));
+        return p;
+    }
+
+    private static String bound(String text, int max) {
+        if (text == null) return null;
+        String s = text.replaceAll("[\\r\\n\\t]+", " ").trim();
+        return s.length() > max ? s.substring(0, max) : s;
     }
 
     private List<String> validateInputs(double weight, int feet, int inches, int age, String sex,

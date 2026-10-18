@@ -26,6 +26,7 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
                         <li><a class="dropdown-item" href="/profile"><i class="bi bi-person"></i> Profile</a></li>
+                        <li><a class="dropdown-item" href="/disclaimer"><i class="bi bi-shield-exclamation"></i> Disclaimer</a></li>
                         <li><hr class="dropdown-divider"></li>
                         <li>
                             <form th:action="@{/logout}" method="post" style="display:inline;">
@@ -50,6 +51,7 @@
         <div class="collapse navbar-collapse" id="publicNavbar">
             <ul class="navbar-nav ms-auto">
                 <li class="nav-item"><a class="nav-link" href="/about">About</a></li>
+                <li class="nav-item"><a class="nav-link" href="/disclaimer">Disclaimer</a></li>
                 <li class="nav-item"><a class="btn btn-neon ms-2" href="/login">Sign In</a></li>
             </ul>
         </div>

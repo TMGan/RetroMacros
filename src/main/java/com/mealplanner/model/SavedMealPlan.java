@@ -57,6 +57,41 @@ public class SavedMealPlan {
     @Column(columnDefinition = "TEXT")
     private String allergies;
 
+    // Plan settings the client picked. Wrapper types so rows from before these columns load as null.
+    @Column(length = 20)
+    private String macroStyle;
+    @Column(length = 20)
+    private String effortLevel;
+    // Ramp week this plan was built for (1 to 4), or null when not ramping.
+    private Integer rampWeek;
+    private Integer fiberTarget;
+    private Integer waterOz;
+    private Boolean healthHold;
+    // Health-screen answers at the time, as HealthCondition keys.
+    @Column(length = 200)
+    private String healthConditions;
+    // What the code checks still flagged after the retry, one per line. Shown to the coach.
+    @Column(columnDefinition = "TEXT")
+    private String qualityNotes;
+
+    public String getMacroStyle() { return macroStyle; }
+    public void setMacroStyle(String macroStyle) { this.macroStyle = macroStyle; }
+    public String getEffortLevel() { return effortLevel; }
+    public void setEffortLevel(String effortLevel) { this.effortLevel = effortLevel; }
+    public Integer getRampWeek() { return rampWeek; }
+    public void setRampWeek(Integer rampWeek) { this.rampWeek = rampWeek; }
+    public Integer getFiberTarget() { return fiberTarget; }
+    public void setFiberTarget(Integer fiberTarget) { this.fiberTarget = fiberTarget; }
+    public Integer getWaterOz() { return waterOz; }
+    public void setWaterOz(Integer waterOz) { this.waterOz = waterOz; }
+    public Boolean getHealthHold() { return healthHold; }
+    public void setHealthHold(Boolean healthHold) { this.healthHold = healthHold; }
+    public String getHealthConditions() { return healthConditions; }
+    public void setHealthConditions(String healthConditions) { this.healthConditions = healthConditions; }
+    public String getQualityNotes() { return qualityNotes; }
+    public void setQualityNotes(String qualityNotes) { this.qualityNotes = qualityNotes; }
+    public boolean isSimple() { return "simple".equals(effortLevel); }
+
     public SavedMealPlan() {
         this.createdAt = LocalDateTime.now();
     }

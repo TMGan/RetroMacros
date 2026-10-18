@@ -48,7 +48,7 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeHttpRequests(auth -> {
-                auth.requestMatchers("/", "/home", "/about", "/login", "/error", "/webjars/**", "/css/**", "/js/**", "/images/**", "/oauth2/**", "/login/oauth2/**", "/demo-login").permitAll();
+                auth.requestMatchers("/", "/home", "/about", "/disclaimer", "/login", "/error", "/webjars/**", "/css/**", "/js/**", "/images/**", "/oauth2/**", "/login/oauth2/**", "/demo-login").permitAll();
                 if (h2ConsoleEnabled) {
                     auth.requestMatchers("/h2-console/**").permitAll();
                 }
