@@ -98,23 +98,6 @@
         Please also check with your doctor before changing how you eat.
     </div>
 
-    <div class="card neon mb-4" th:if="${nutrition != null}">
-        <div class="card-body">
-            <h6 class="section-title mb-2"><i class="bi bi-capsule"></i> Supplement note: creatine</h6>
-            <p class="mb-2" th:if="${!nutrition.creatineNeedsDoctor}">
-                Creatine monohydrate, 3 to 5 g a day, is one of the most studied supplements there is. It supports strength,
-                muscle and recovery, and it's safe for healthy adults. Mix it into water or a shake at any time of day.
-            </p>
-            <p class="mb-2" th:if="${nutrition.creatineNeedsDoctor}">
-                Creatine (3 to 5 g a day) is safe for most healthy adults, but based on your health check, <strong>talk to your doctor before starting it</strong>.
-            </p>
-            <p class="text-muted small mb-0">
-                Heads up: creatine pulls water into your muscles, so the scale often goes up 2 to 4 lb in the first couple of weeks.
-                That's water, not fat. Keep your water intake up.
-            </p>
-        </div>
-    </div>
-
     <div th:each="day : ${mealPlan.days}" class="mb-5">
         <h4 class="section-title" th:text="${'Day ' + day.dayNumber}">Day 1</h4>
 
@@ -219,7 +202,24 @@
             </div>
         </div>
     </div>
-    
+
+    <!-- After the meals and groceries: it's an add-on to the plan, not part of the targets. -->
+    <div class="supplement-note mt-4" th:if="${nutrition != null}">
+        <i class="bi bi-capsule supplement-icon" aria-hidden="true"></i>
+        <div class="flex-grow-1">
+            <div class="supplement-title">Daily supplement: creatine monohydrate <span class="supplement-dose">3 to 5 g</span></div>
+            <div class="supplement-sub" th:unless="${nutrition.creatineNeedsDoctor}">Supports strength and recovery. Mix into water or a shake, any time of day.</div>
+            <div class="supplement-sub supplement-warn" th:if="${nutrition.creatineNeedsDoctor}">Based on your health check, ask your doctor before starting it.</div>
+            <details class="supplement-more">
+                <summary>Why creatine?</summary>
+                <ul>
+                    <li>It's one of the most studied supplements there is and is safe for healthy adults.</li>
+                    <li>The scale may go up 2 to 4 lb in the first couple of weeks. That's water in your muscles, not fat.</li>
+                    <li>Plain creatine monohydrate is all you need. Drink a little extra water.</li>
+                </ul>
+            </details>
+        </div>
+    </div>
 </div>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
@@ -529,5 +529,6 @@
     </div>
     <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button></div>
 </div></div></div>
+<div th:replace="~{fragments/footer :: footer}"></div>
 </body>
 </html>

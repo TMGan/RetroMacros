@@ -14,8 +14,14 @@
   --glow: 0 0 8px rgba(45, 212, 255, 0.6), 0 0 20px rgba(167, 139, 250, 0.35);
 }
 
-html, body {
+/* The html element gets its own color so the body paints its gradient over the full page height.
+   Without it the gradient is sized to one screen and repeats, leaving a visible seam on long pages. */
+html {
   height: 100%;
+  background: var(--bg-alt);
+}
+body {
+  min-height: 100%;
 }
 
 body.neon {
@@ -463,6 +469,52 @@ a:hover { color: var(--neon-purple); text-shadow: 0 0 6px rgba(45,212,255,0.6); 
   color: var(--muted);
 }
 .target-note .bi { color: var(--neon-blue); margin-right: 6px; }
+
+/* Supplement callout on the plan page: same tile language, one slim row */
+.supplement-note {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 14px 16px;
+  border: 1px solid rgba(167, 139, 250, 0.18);
+  border-left: 3px solid var(--neon-purple);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.supplement-icon { font-size: 1.25rem; color: var(--neon-purple); line-height: 1.4; }
+.supplement-title { font-weight: 600; }
+.supplement-dose {
+  margin-left: 8px;
+  padding: 1px 10px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  border: 1px solid rgba(167, 139, 250, 0.45);
+  border-radius: 999px;
+  color: var(--neon-purple);
+  white-space: nowrap;
+}
+.supplement-sub { font-size: 0.875rem; color: var(--muted); margin-top: 2px; }
+.supplement-warn { color: var(--warning); }
+.supplement-more { margin-top: 6px; font-size: 0.875rem; }
+.supplement-more summary { color: var(--neon-blue); }
+.supplement-more ul { margin: 8px 0 0; padding-left: 1.1rem; color: var(--muted); }
+
+/* Disclaimer page */
+.disclaimer-list { padding-left: 1.1rem; margin-bottom: 1rem; }
+.disclaimer-list li { margin-bottom: 0.85rem; line-height: 1.55; }
+.disclaimer-list li::marker { color: var(--neon-blue); }
+
+/* One-line disclaimer at the bottom of every page */
+.site-footer {
+  margin-top: 48px;
+  padding: 18px 0 24px;
+  border-top: 1px solid rgba(45, 212, 255, 0.12);
+  font-size: 0.8rem;
+  color: var(--muted);
+  text-align: center;
+}
+.site-footer a { color: var(--muted); text-decoration: underline; }
+.site-footer a:hover { color: var(--neon-blue); }
 
 /* Body measurement diagram. Desktop: inputs sit beside the figure with leader lines.
    Phones: the figure shows numbered spots and the inputs list underneath. */

@@ -103,7 +103,7 @@ class PlanEngineFeatureTest {
                         .with(signedInAs(client)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Easing in · week 1 of 4")))
-                .andExpect(content().string(containsString("Creatine monohydrate")))
+                .andExpect(content().string(containsString("Daily supplement: creatine monohydrate")))
                 .andExpect(content().string(containsString("Fiber")));
 
         SavedMealPlan saved = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0);
@@ -124,7 +124,7 @@ class PlanEngineFeatureTest {
                         .param("healthNotes", "stage 2, seeing a nephrologist").with(signedInAs(client)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("set to maintenance calories")))
-                .andExpect(content().string(containsString("talk to your doctor before starting it")));
+                .andExpect(content().string(containsString("ask your doctor before starting it")));
 
         SavedMealPlan saved = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0);
         assertThat(saved.getHealthHold()).isTrue();
