@@ -417,6 +417,53 @@ a:hover { color: var(--neon-purple); text-shadow: 0 0 6px rgba(45,212,255,0.6); 
 }
 .neon details > summary { cursor: pointer; }
 
+/* Daily target tiles on the plan page: equal size, left-aligned, color-coded by macro */
+.target-tile {
+  height: 100%;
+  padding: 14px 16px;
+  border: 1px solid rgba(167, 139, 250, 0.18);
+  border-left: 3px solid var(--tile-accent, var(--neon-blue));
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+.target-tile .stat-value { font-size: 1.6rem; white-space: nowrap; }
+.target-tile .stat-value small {
+  font-family: system-ui, sans-serif;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.tile-calories { --tile-accent: var(--text); }
+.tile-protein { --tile-accent: var(--neon-blue); }
+.tile-carbs { --tile-accent: var(--warning); }
+.tile-fat { --tile-accent: var(--danger); }
+.tile-fiber { --tile-accent: var(--success); }
+.tile-water { --tile-accent: var(--neon-purple); }
+.target-tile .stat-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.target-split {
+  display: flex;
+  height: 6px;
+  /* Sits where the other tiles' one-line note sits. */
+  margin: 10px 0 6px;
+  border-radius: 3px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.06);
+}
+.target-split .macro-seg { float: none; }
+.target-badge {
+  font-size: 0.8rem;
+  padding: 4px 12px;
+  border: 1px solid rgba(45, 212, 255, 0.45);
+  border-radius: 999px;
+  color: var(--neon-blue);
+}
+.target-note {
+  margin: 14px 0 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.target-note .bi { color: var(--neon-blue); margin-right: 6px; }
+
 /* Body measurement diagram. Desktop: inputs sit beside the figure with leader lines.
    Phones: the figure shows numbered spots and the inputs list underneath. */
 .body-map { position: relative; }
