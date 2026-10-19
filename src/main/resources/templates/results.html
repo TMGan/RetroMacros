@@ -463,7 +463,9 @@
         }).then(r => r.json()).then(data => {
             const list = document.getElementById('swapOptionsList');
             list.innerHTML = '';
-            if (data.success && Array.isArray(data.suggestions)) {
+            if (data.success && Array.isArray(data.suggestions) && data.suggestions.length === 0) {
+                list.innerHTML = '<div class="text-muted">No swaps for this food fit your allergies and foods to avoid.</div>';
+            } else if (data.success && Array.isArray(data.suggestions)) {
                 data.suggestions.forEach(opt => {
                     const item = document.createElement('button');
                     item.className = 'list-group-item list-group-item-action';

@@ -40,6 +40,7 @@ class PlanEngineFeatureTest {
     @Autowired private UserRepository userRepository;
     @Autowired private AllowedEmailRepository allowedEmailRepository;
     @Autowired private SavedMealPlanRepository savedMealPlanRepository;
+    @Autowired private com.mealplanner.service.UserFoodPreferencesService preferencesService;
 
     private User invitedClient() {
         String email = UUID.randomUUID() + "@example.com";
@@ -149,6 +150,29 @@ class PlanEngineFeatureTest {
                         .param("proteinPercent", "50").param("carbsPercent", "40").param("fatPercent", "30")
                         .with(signedInAs(invitedClient())))
                 .andExpect(content().string(containsString("must add up to 100%")));
+    }
+
+    @Test
+    void ingredientSwapsSkipAllergiesAndAvoidedFoods() throws Exception {
+        User client = invitedClient();
+        SavedMealPlan plan = new SavedMealPlan();
+        plan.setUser(client);
+        plan.setAllergies("Fish, Tree Nuts");
+        savedMealPlanRepository.save(plan);
+        preferencesService.savePreferences(client, "", "avocado", "mostly-home-cooked", "flexible");
+
+        String proteins = mvc.perform(post("/swap/ingredient-options").param("originalFood", "chicken breast")
+                        .param("calories", "0").param("protein", "0").param("carbs", "0").param("fat", "0")
+                        .with(signedInAs(client)).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(proteins).contains("Ground turkey").doesNotContain("Salmon").doesNotContain("Tilapia");
+
+        String fats = mvc.perform(post("/swap/ingredient-options").param("originalFood", "olive oil")
+                        .param("calories", "0").param("protein", "0").param("carbs", "0").param("fat", "0")
+                        .with(signedInAs(client)).with(csrf()))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+        assertThat(fats).contains("Olive oil").contains("Peanut butter")
+                .doesNotContain("Almonds").doesNotContain("Walnuts").doesNotContain("Avocado");
     }
 
     @Test
