@@ -102,7 +102,7 @@ class PlanEngineFeatureTest {
         mvc.perform(plan().param("acceptDisclaimer", "true").param("effortLevel", "simple").param("ramp", "true")
                         .with(signedInAs(client)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Easing in: week 1 of 4")))
+                .andExpect(content().string(containsString("Easing in · week 1 of 4")))
                 .andExpect(content().string(containsString("Creatine monohydrate")))
                 .andExpect(content().string(containsString("Fiber")));
 

@@ -23,25 +23,71 @@
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
                 <h5 class="card-title mb-0 section-title">Your Daily Targets</h5>
-                <span class="badge bg-info text-dark" th:if="${nutrition != null and nutrition.rampWeek != null}"
-                      th:text="'Easing in: week ' + ${nutrition.rampWeek} + ' of 4'">Easing in: week 1 of 4</span>
+                <span class="target-badge" th:if="${nutrition != null and nutrition.rampWeek != null}"
+                      th:text="'Easing in · week ' + ${nutrition.rampWeek} + ' of 4'">Easing in · week 1 of 4</span>
             </div>
-            <div class="row text-center">
-                <div class="col-6 col-md-3"><div><strong>Calories</strong></div><div th:text="${targets.calories}">2100</div></div>
-                <div class="col-6 col-md-3"><div><strong>Protein</strong></div><div th:text="${targets.protein + ' g'}">158 g</div></div>
-                <div class="col-6 col-md-3 mt-2 mt-md-0"><div><strong>Carbs</strong></div><div th:text="${targets.carbs + ' g'}">210 g</div></div>
-                <div class="col-6 col-md-3 mt-2 mt-md-0"><div><strong>Fat</strong></div><div th:text="${targets.fat + ' g'}">70 g</div></div>
+            <!-- Six equal tiles. Each small line says why the number matters or how to use it. -->
+            <div class="row row-cols-2 row-cols-md-3 row-cols-xl-6 g-3"
+                 th:with="cal=${targets.calories > 0 ? targets.calories : 1},
+                          pPct=${T(java.lang.Math).round(targets.protein * 400.0 / cal)},
+                          cPct=${T(java.lang.Math).round(targets.carbs * 400.0 / cal)},
+                          fPct=${T(java.lang.Math).round(targets.fat * 900.0 / cal)}">
+                <div class="col">
+                    <div class="target-tile stat-tile tile-calories">
+                        <div class="stat-label">Calories</div>
+                        <div class="stat-value"><span th:text="${targets.calories}">2212</span><small>cal</small></div>
+                        <!-- Colors match the protein, carb and fat tiles. -->
+                        <div class="target-split" role="img"
+                             th:attr="aria-label=${pPct} + '% protein, ' + ${cPct} + '% carbs, ' + ${fPct} + '% fat'">
+                            <span class="macro-seg protein" th:style="'width:' + ${pPct} + '%'"></span>
+                            <span class="macro-seg carb" th:style="'width:' + ${cPct} + '%'"></span>
+                            <span class="macro-seg fat" th:style="'width:' + ${fPct} + '%'"></span>
+                        </div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="target-tile stat-tile tile-protein">
+                        <div class="stat-label">Protein</div>
+                        <div class="stat-value"><span th:text="${targets.protein}">208</span><small>g</small></div>
+                        <div class="stat-sub" th:text="${pPct} + '% of calories'">38% of calories</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="target-tile stat-tile tile-carbs">
+                        <div class="stat-label">Carbs</div>
+                        <div class="stat-value"><span th:text="${targets.carbs}">205</span><small>g</small></div>
+                        <div class="stat-sub" th:text="${cPct} + '% of calories'">37% of calories</div>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="target-tile stat-tile tile-fat">
+                        <div class="stat-label">Fat</div>
+                        <div class="stat-value"><span th:text="${targets.fat}">62</span><small>g</small></div>
+                        <div class="stat-sub" th:text="${fPct} + '% of calories'">25% of calories</div>
+                    </div>
+                </div>
+                <div class="col" th:if="${nutrition != null}">
+                    <div class="target-tile stat-tile tile-fiber">
+                        <div class="stat-label">Fiber</div>
+                        <div class="stat-value"><span th:text="${nutrition.fiber}">31</span><small>g</small></div>
+                        <div class="stat-sub">Daily minimum</div>
+                    </div>
+                </div>
+                <div class="col" th:if="${nutrition != null}">
+                    <div class="target-tile stat-tile tile-water">
+                        <div class="stat-label">Water</div>
+                        <div class="stat-value"><span th:text="${nutrition.waterOz}">104</span><small>oz</small></div>
+                        <div class="stat-sub">More on gym days</div>
+                    </div>
+                </div>
             </div>
-            <div class="row text-center mt-3" th:if="${nutrition != null}">
-                <div class="col-6"><div><strong>Fiber</strong></div><div th:text="'at least ' + ${nutrition.fiber} + ' g'">30 g</div></div>
-                <div class="col-6"><div><strong>Water</strong></div><div th:text="'about ' + ${nutrition.waterOz} + ' oz'">90 oz</div>
-                    <small class="text-muted">plus 12 to 16 oz on training days</small></div>
-            </div>
-            <p class="text-muted small mt-3 mb-0" th:if="${nutrition != null and nutrition.rampWeek != null and nutrition.rampWeek < 4}">
-                These are this week's targets. Each week they step a little closer to your full plan. Make a new plan when the next week starts.
+            <p class="target-note" th:if="${nutrition != null and nutrition.rampWeek != null and nutrition.rampWeek < 4}">
+                <i class="bi bi-arrow-up-right-circle"></i>
+                These are this week's targets. Each week they step closer to your full plan, so make a new plan when the next week starts.
             </p>
-            <p class="text-muted small mt-3 mb-0" th:if="${nutrition != null and nutrition.floorApplied}">
-                Your calories are set to a safe minimum, so you're never eating less than your body needs at rest.
+            <p class="target-note" th:if="${nutrition != null and nutrition.floorApplied}">
+                <i class="bi bi-shield-check"></i>
+                Calories are set to a safe minimum, so you never eat less than your body needs at rest.
             </p>
         </div>
     </div>
