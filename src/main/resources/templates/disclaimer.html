@@ -14,40 +14,30 @@
 
 <div class="container my-5">
     <div class="row">
-        <div class="col-lg-8 mx-auto">
-            <h1 class="mb-4 section-title">Disclaimer</h1>
+        <div class="col-lg-7 mx-auto">
+            <h1 class="mb-2 section-title">Disclaimer</h1>
+            <p class="text-muted mb-4">The short version: this is general guidance, not medical care. Talk to your doctor first.</p>
 
-            <div class="card neon mb-4"><div class="card-body">
-                <h5 class="section-title">Not medical advice</h5>
-                <p>Retro Macros gives general nutrition and fitness information for healthy adults. It is not medical advice and
-                    does not replace a doctor, registered dietitian or other licensed health professional. It does not diagnose,
-                    treat or prevent any disease or condition.</p>
-
-                <h5 class="section-title mt-4">Talk to your doctor first</h5>
-                <p>Check with your doctor before changing how you eat, starting an exercise program, or taking any supplement,
-                    including creatine or protein powder. This matters most if you are pregnant or breastfeeding, have a medical
-                    condition (such as kidney disease, diabetes or heart disease), take medication, or have a history of an
-                    eating disorder.</p>
-
-                <h5 class="section-title mt-4">How plans are made</h5>
-                <p>Calorie and macro targets are estimates from standard formulas. Meal plans and macro numbers are written with the
-                    help of AI and may contain mistakes, including in nutrition values and ingredients. Always read labels and check
-                    ingredients yourself, especially for allergies. You are responsible for what you choose to eat.</p>
-
-                <h5 class="section-title mt-4">Results vary</h5>
-                <p>Everyone's body is different. Progress depends on many things, and no particular result is promised.</p>
-
-                <h5 class="section-title mt-4">Stop and get help</h5>
-                <p class="mb-0">If you feel unwell, dizzy, faint or have chest pain while following a plan or exercising, stop and
-                    contact a doctor. In an emergency, call 911 or your local emergency number.</p>
+            <div class="card neon"><div class="card-body p-4">
+                <ul class="disclaimer-list">
+                    <li><strong>Not medical advice.</strong> Retro Macros gives general nutrition information for healthy adults.
+                        It doesn't replace a doctor or dietitian, and it doesn't diagnose or treat anything.</li>
+                    <li><strong>Check with your doctor first</strong> before changing how you eat, exercising more, or starting
+                        any supplement, including creatine. This matters most if you're pregnant, have a health condition,
+                        take medication, or have had an eating disorder.</li>
+                    <li><strong>Plans can have mistakes.</strong> Targets are estimates and meals are written with AI help.
+                        Always check labels and ingredients, especially for allergies.</li>
+                    <li><strong>Results vary.</strong> Everyone's body is different, and no result is promised.</li>
+                    <li><strong>Stop if something feels wrong.</strong> If you feel dizzy, faint or unwell, stop and see a doctor.
+                        In an emergency, call 911.</li>
+                </ul>
+                <p class="text-muted small mb-0">By using Retro Macros you accept that you use it at your own risk.</p>
             </div></div>
-
-            <p class="text-muted small">By using Retro Macros you agree that you use it at your own risk and that Retro Macros and its coach
-                are not liable for any injury, illness or loss that results from following its information.</p>
         </div>
     </div>
 </div>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<div th:replace="~{fragments/footer :: footer}"></div>
 </body>
 </html>
