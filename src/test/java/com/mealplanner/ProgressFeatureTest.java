@@ -112,7 +112,7 @@ class ProgressFeatureTest {
                 .andExpect(content().string(containsString("chart.umd.min.js")));
         mvc.perform(get("/progress").with(signedInAs(bob)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Your charts appear after your first check-in")))
+                .andExpect(content().string(containsString("Your charts show up here after your first check-in")))
                 .andExpect(content().string(not(containsString("186.2"))));
     }
 
@@ -148,7 +148,7 @@ class ProgressFeatureTest {
         User client = newUser(false);
         User coach = newUser(true);
         mvc.perform(post("/progress/goal").param("goalWeight", "175").with(signedInAs(client)).with(csrf()))
-                .andExpect(redirectedUrl("/progress#goal"));
+                .andExpect(redirectedUrl("/progress#overview"));
         assertThat(userRepository.findById(client.getId()).orElseThrow().getGoalWeightLbs()).isEqualTo(175.0);
 
         long audits = auditLogRepository.count();
@@ -195,7 +195,7 @@ class ProgressFeatureTest {
         assertThat(checkInRepository.findByUserOrderByCheckInDateAsc(demo)).hasSizeGreaterThan(10);
         mvc.perform(get("/progress").with(signedInAs(demo)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Challenge recap")));
+                .andExpect(content().string(containsString("Your habits")));
     }
 
     @Test
@@ -214,7 +214,7 @@ class ProgressFeatureTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        for (String id : java.util.List.of("checkin", "overview", "charts", "details", "measurements", "goal")) {
+        for (String id : java.util.List.of("checkin", "overview", "charts", "measurements")) {
             assertThat(html).contains("data-section=\"" + id + "\"");
             assertThat(html).contains("<section class=\"progress-section\" id=\"" + id + "\"");
         }

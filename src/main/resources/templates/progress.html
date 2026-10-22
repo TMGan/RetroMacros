@@ -13,168 +13,189 @@
 <div th:replace="~{fragments/navbar :: authenticated-navbar}"></div>
 <div th:if="${impersonating}" class="alert alert-warning text-center mb-0 rounded-0">Viewing <strong th:text="${user.name}">client</strong> (read-only). <a href="/admin/exit-impersonation">Exit client view</a></div>
 
-<div class="container py-4">
-    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
-        <h2 class="section-title mb-0">Your progress</h2>
-        <span class="text-muted" th:if="${summary.hasData}" th:text="'Week ' + ${summary.weeksIn} + ' · last check-in ' + ${#temporals.format(summary.latestDate, 'MMM d')}"></span>
-    </div>
+<div class="container today">
+    <header class="today-head">
+        <div>
+            <h1 class="today-title">Progress</h1>
+            <p class="today-date" th:if="${summary.hasData}" th:text="'Week ' + ${summary.weeksIn} + ' · last check-in ' + ${#temporals.format(summary.latestDate, 'MMM d')}">Week 5</p>
+            <p class="today-date" th:unless="${summary.hasData}">Check in to start tracking.</p>
+        </div>
+    </header>
 
     <div th:if="${success}" class="alert alert-success" th:text="${success}">Saved</div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}">Error</div>
 
-    <!-- Section menu: tabs on wide screens, a menu button on phones. Without JavaScript every section just shows. -->
-    <nav class="progress-menu mb-4" aria-label="Progress sections"
+    <!-- Tabs in order of how often they're needed. Without JavaScript every section shows. -->
+    <nav class="plan-tabs progress-menu" aria-label="Progress sections"
          th:attr="data-default=${todayEntry == null and !impersonating} ? 'checkin' : 'overview'">
-        <ul class="nav nav-pills d-none d-md-flex gap-1">
-            <li class="nav-item" th:each="s : ${progressSections}">
-                <a class="nav-link" th:href="'#' + ${s[0]}" th:attr="data-section=${s[0]}">
-                    <i th:class="'bi ' + ${s[2]}"></i> <span th:text="${s[1]}">Section</span>
-                </a>
-            </li>
-        </ul>
-        <div class="dropdown d-md-none">
-            <button class="btn btn-outline-neon dropdown-toggle w-100 d-flex align-items-center gap-2" type="button"
-                    data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="bi bi-list"></i> <span class="progress-menu-current">Sections</span>
-            </button>
-            <ul class="dropdown-menu w-100">
-                <li th:each="s : ${progressSections}">
-                    <a class="dropdown-item" th:href="'#' + ${s[0]}" th:attr="data-section=${s[0]}">
-                        <i th:class="'bi ' + ${s[2]}"></i> <span th:text="${s[1]}">Section</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
+        <a th:each="s : ${progressSections}" th:href="'#' + ${s[0]}" th:attr="data-section=${s[0]}">
+            <i th:class="'bi ' + ${s[2]}"></i> <span th:text="${s[1]}">Section</span>
+        </a>
     </nav>
 
+    <!-- Check in -->
     <section class="progress-section" id="checkin">
-    <div th:if="${summary.hasData && summary.missedCheckIn}" class="alert alert-warning">
-        No check-in in the last 7 days. A quick weigh-in keeps your trend line honest.
-    </div>
+        <div class="card neon checkin-done mb-3" th:if="${todayEntry != null}">
+            <div class="card-body p-4 d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                    <div class="stat-label">Checked in today</div>
+                    <div class="checkin-done-weight" th:text="${todayEntry.weightLbs} + ' lb'">182.4 lb</div>
+                    <div class="text-muted small" th:if="${todayEntry.bodyFatPct != null}" th:text="${todayEntry.bodyFatPct} + '% body fat'"></div>
+                </div>
+                <button type="button" class="btn btn-outline-neon" data-checkin-edit th:unless="${impersonating}">Edit today's check-in</button>
+            </div>
+        </div>
 
-    <!-- Check-in form -->
-    <div class="card neon mb-4">
-        <div class="card-body">
-            <details class="checkin-panel" th:attr="open=${todayEntry == null} ? 'open' : null">
-            <summary class="h5 mb-1 d-flex align-items-center gap-2">
-                <span th:if="${todayEntry == null}">Check in</span>
-                <span th:if="${todayEntry != null}"><i class="bi bi-check-circle-fill text-success"></i> Checked in today <span class="text-muted fs-6" th:text="${todayEntry.weightLbs} + ' lb · tap to edit'"></span></span>
-            </summary>
-            <p class="text-muted small mb-3 mt-2">Weigh in as often as you like, ideally first thing in the morning. Only weight is required.</p>
-            <form th:action="@{/progress/check-in}" method="post">
-                <div class="row g-3">
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="weight">Weight (lb)</label>
-                        <input class="form-control" type="number" id="weight" name="weight" step="0.1" min="70" max="700" required
-                               th:value="${todayEntry?.weightLbs}">
-                    </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label" for="bodyFat">Body fat % <span class="text-muted">(optional)</span></label>
-                        <input class="form-control" type="number" id="bodyFat" name="bodyFat" step="0.1" min="3" max="70"
-                               th:value="${todayEntry?.bodyFatPct}">
-                    </div>
-                    <div class="col-12 col-md-3">
-                        <label class="form-label" for="date">Date</label>
-                        <input class="form-control" type="date" id="date" name="date"
-                               th:value="${today}" th:max="${today}" th:min="${earliestDate}">
-                    </div>
+        <div class="today-nudge" th:if="${todayEntry == null and summary.hasData and summary.missedCheckIn}">
+            <i class="bi bi-clock-history"></i> <span>It's been over a week since your last weigh-in.</span>
+        </div>
+
+        <form th:action="@{/progress/check-in}" method="post" class="card neon checkin-flow" id="checkinForm"
+              th:attr="data-hidden=${todayEntry != null}" th:unless="${impersonating}">
+            <div class="card-body p-4 p-md-5">
+                <div class="wizard-head">
+                    <div class="wizard-step-label"><span class="wizard-count">Step 1 of 6</span> · <span class="wizard-title">Weigh in</span></div>
+                    <div class="wizard-progress" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span></div>
                 </div>
 
-                <details class="mt-3" open>
-                    <summary class="text-muted">How are you feeling? (optional)</summary>
-                    <div class="row g-3 mt-1">
-                        <div class="col-12 col-md-6" th:each="score : ${ {'energy','sleep','hunger','stress'} }">
-                            <div class="form-label text-capitalize" th:text="${score} + (${score == 'hunger' or score == 'stress'} ? ' (1 low, 5 high)' : ' (1 poor, 5 great)')">Energy</div>
-                            <div class="btn-group w-100" role="group" th:attr="aria-label=${score}">
-                                <th:block th:each="n : ${#numbers.sequence(1, 5)}">
-                                    <input type="radio" class="btn-check" th:name="${score}" th:id="${score + n}" th:value="${n}"
-                                           th:checked="${todayEntry != null and todayEntry[score] == n}">
-                                    <label class="btn btn-outline-neon" th:for="${score + n}" th:text="${n}">1</label>
-                                </th:block>
-                            </div>
+                <section class="form-step" data-step="1" data-title="Weigh in">
+                    <h2 class="wizard-heading">Weigh in</h2>
+                    <p class="wizard-sub">First thing in the morning works best. Only weight is required.</p>
+                    <div class="row g-3">
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="weight">Weight (lb)</label>
+                            <input class="form-control" type="number" id="weight" name="weight" step="0.1" min="70" max="700" required th:value="${todayEntry?.weightLbs}">
+                            <div class="invalid-feedback">Between 70 and 700 lb.</div>
                         </div>
-                        <div class="col-12">
-                            <label class="form-label" for="note">Note for your coach</label>
-                            <textarea class="form-control" id="note" name="note" rows="2" maxlength="500"
-                                      placeholder="Anything worth knowing this week" th:text="${todayEntry?.note}"></textarea>
+                        <div class="col-6 col-md-4">
+                            <label class="form-label" for="bodyFat">Body fat % <span class="text-muted">(optional)</span></label>
+                            <input class="form-control" type="number" id="bodyFat" name="bodyFat" step="0.1" min="3" max="70" th:value="${todayEntry?.bodyFatPct}">
+                            <div class="invalid-feedback">Between 3 and 70.</div>
+                        </div>
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="date">Date</label>
+                            <input class="form-control" type="date" id="date" name="date" th:value="${today}" th:max="${today}" th:min="${earliestDate}">
                         </div>
                     </div>
-                </details>
+                </section>
 
-                <button type="submit" class="btn btn-neon mt-3"><i class="bi bi-check2-circle"></i> Save check-in</button>
-            </form>
-            </details>
-        </div>
-    </div>
+                <!-- One feeling per step. Each slider starts unset; skipping leaves it out. -->
+                <section class="form-step" data-step="2" data-title="Energy">
+                    <h2 class="wizard-heading">How's your energy been?</h2>
+                    <p class="wizard-sub">Think about the last day or two.</p>
+                    <div class="feel" data-words="Very low|Low|OK|Good|Great">
+                        <div class="feel-word">Drag to answer</div>
+                        <input type="range" class="form-range feel-range" min="1" max="5" step="1" value="3" aria-label="Energy, 1 to 5">
+                        <input type="hidden" name="energy" th:value="${todayEntry?.energy}">
+                        <div class="feel-ends"><span>Very low</span><span>Great</span></div>
+                    </div>
+                </section>
+                <section class="form-step" data-step="3" data-title="Sleep">
+                    <h2 class="wizard-heading">How have you been sleeping?</h2>
+                    <p class="wizard-sub">How rested you feel, not just the hours.</p>
+                    <div class="feel" data-words="Very poorly|Poorly|OK|Well|Great">
+                        <div class="feel-word">Drag to answer</div>
+                        <input type="range" class="form-range feel-range" min="1" max="5" step="1" value="3" aria-label="Sleep, 1 to 5">
+                        <input type="hidden" name="sleep" th:value="${todayEntry?.sleep}">
+                        <div class="feel-ends"><span>Very poorly</span><span>Great</span></div>
+                    </div>
+                </section>
+                <section class="form-step" data-step="4" data-title="Hunger">
+                    <h2 class="wizard-heading">How hungry have you been?</h2>
+                    <p class="wizard-sub">Feeling hungry a lot is useful for your coach to know.</p>
+                    <div class="feel" data-words="Not at all|A little|Normal|Hungry|Very hungry">
+                        <div class="feel-word">Drag to answer</div>
+                        <input type="range" class="form-range feel-range" min="1" max="5" step="1" value="3" aria-label="Hunger, 1 to 5">
+                        <input type="hidden" name="hunger" th:value="${todayEntry?.hunger}">
+                        <div class="feel-ends"><span>Not at all</span><span>Very hungry</span></div>
+                    </div>
+                </section>
+                <section class="form-step" data-step="5" data-title="Stress">
+                    <h2 class="wizard-heading">How stressed have you been?</h2>
+                    <p class="wizard-sub">Work, life, anything.</p>
+                    <div class="feel" data-words="Very low|Low|Some|High|Very high">
+                        <div class="feel-word">Drag to answer</div>
+                        <input type="range" class="form-range feel-range" min="1" max="5" step="1" value="3" aria-label="Stress, 1 to 5">
+                        <input type="hidden" name="stress" th:value="${todayEntry?.stress}">
+                        <div class="feel-ends"><span>Very low</span><span>Very high</span></div>
+                    </div>
+                </section>
+                <section class="form-step" data-step="6" data-title="Note">
+                    <h2 class="wizard-heading">Anything for your coach?</h2>
+                    <p class="wizard-sub">Optional. A tough week, a win, a question.</p>
+                    <textarea class="form-control" id="note" name="note" rows="3" maxlength="500"
+                              placeholder="e.g. Travelled this week, ate out a lot" th:text="${todayEntry?.note}"></textarea>
+                </section>
 
+                <div class="step-error" role="alert" hidden></div>
+
+                <div class="wizard-nav">
+                    <button type="button" class="btn btn-outline-neon" data-wizard="back">Back</button>
+                    <button type="button" class="btn btn-link checkin-skip" data-wizard="skip">Skip</button>
+                    <button type="submit" class="btn btn-outline-neon" data-wizard="quick">Save weight only</button>
+                    <button type="button" class="btn btn-neon" data-wizard="next">Next</button>
+                    <button type="submit" class="btn btn-neon" data-wizard="save">Save check-in</button>
+                </div>
+            </div>
+        </form>
     </section>
 
+    <!-- Overview: the whole picture, every number explained -->
     <section class="progress-section" id="overview">
         <div th:unless="${summary.hasData}" class="card neon mb-4">
-            <div class="card-body text-center text-muted py-4">Your numbers appear after your first check-in.</div>
+            <div class="card-body text-center text-muted py-4">Your numbers show up here after your first check-in.</div>
         </div>
         <th:block th:replace="~{fragments/progress :: stats(${summary})}"></th:block>
-        <th:block th:replace="~{fragments/progress :: recap(${summary}, ${msummary})}"></th:block>
+        <div class="collapse mb-4" id="goal-form" th:if="${goalEditable}">
+            <form th:action="@{/progress/goal}" method="post" class="card neon">
+                <div class="card-body p-4 d-flex flex-wrap align-items-end gap-3">
+                    <div>
+                        <label class="form-label" for="goalWeight">Goal weight (lb)</label>
+                        <input class="form-control" type="number" id="goalWeight" name="goalWeight" step="0.1" min="70" max="700" placeholder="e.g. 175" th:value="${user.goalWeightLbs}">
+                    </div>
+                    <button type="submit" class="btn btn-neon">Save goal</button>
+                    <small class="text-muted w-100">Leave it empty to clear it. Your coach can change it too.</small>
+                </div>
+            </form>
+        </div>
+        <th:block th:if="${summary.hasData}"><th:block th:replace="~{fragments/progress :: details(${summary}, ${msummary})}"></th:block></th:block>
     </section>
 
     <section class="progress-section" id="charts">
         <div th:unless="${summary.hasData}" class="card neon mb-4">
-            <div class="card-body text-center text-muted py-4">Your charts appear after your first check-in.</div>
+            <div class="card-body text-center text-muted py-4">Your charts show up here after your first check-in.</div>
         </div>
         <th:block th:if="${summary.hasData}"><th:block th:replace="~{fragments/progress :: charts(${chartJson})}"></th:block></th:block>
     </section>
 
-    <section class="progress-section" id="details">
-        <th:block th:replace="~{fragments/progress :: details(${summary})}"></th:block>
-    </section>
-
-    <!-- Measurements: monthly, entered on the body diagram -->
+    <!-- Measurements: optional, monthly, entered on the body diagram -->
     <section class="progress-section" id="measurements">
-    <div class="card neon mb-4">
-        <div class="card-body">
-            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
-                <h5 class="mb-0"><i class="bi bi-rulers"></i> Measurements</h5>
-                <span class="text-muted small" th:if="${msummary.hasData}" th:text="'Last measured ' + ${#temporals.format(msummary.lastDate, 'MMM d')}"></span>
+        <div class="card neon mb-4">
+            <div class="card-body">
+                <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-1">
+                    <h5 class="mb-0">Measurements</h5>
+                    <span class="text-muted small" th:if="${msummary.hasData}" th:text="'Last measured ' + ${#temporals.format(msummary.lastDate, 'MMM d')}"></span>
+                </div>
+                <p class="text-muted small mb-3">Optional. Every 4 weeks is plenty. The scale can stall while inches keep dropping.</p>
+                <div th:if="${measurementSuccess}" class="alert alert-success" th:text="${measurementSuccess}">Saved</div>
+                <div th:if="${measurementError}" class="alert alert-danger" th:text="${measurementError}">Error</div>
+                <div th:if="${msummary.due and measurementError == null and measurementSuccess == null}" class="alert alert-info"
+                     th:text="${msummary.hasData} ? 'It has been 4 weeks. Time to measure again.' : 'Take your starting measurements if you want to see inches change, not just pounds.'">Time to measure</div>
+                <th:block th:replace="~{fragments/measurements :: history(${msummary}, ${measurementJson})}"></th:block>
+                <details class="mt-3" th:attr="open=${msummary.due} ? 'open' : null">
+                    <summary class="h6">Enter measurements</summary>
+                    <div class="mt-3">
+                        <th:block th:replace="~{fragments/measurements :: form(${diagramRows}, ${bodyDiagram}, ${today}, ${measurementEarliest})}"></th:block>
+                    </div>
+                </details>
             </div>
-            <p class="text-muted small mb-3">Every 4 weeks is plenty. The scale can stall while inches keep dropping.</p>
-            <div th:if="${measurementSuccess}" class="alert alert-success" th:text="${measurementSuccess}">Saved</div>
-            <div th:if="${measurementError}" class="alert alert-danger" th:text="${measurementError}">Error</div>
-            <div th:if="${msummary.due and measurementError == null and measurementSuccess == null}" class="alert alert-info"
-                 th:text="${msummary.hasData} ? 'It has been 4 weeks. Time to measure again.' : 'Take your starting measurements so you can see inches change, not just pounds.'">Time to measure</div>
-            <th:block th:replace="~{fragments/measurements :: history(${msummary}, ${measurementJson})}"></th:block>
-            <details class="mt-3" th:attr="open=${msummary.due} ? 'open' : null">
-                <summary class="h6">Enter measurements</summary>
-                <div class="mt-3">
-                    <th:block th:replace="~{fragments/measurements :: form(${diagramRows}, ${bodyDiagram}, ${today}, ${measurementEarliest})}"></th:block>
-                </div>
-            </details>
         </div>
-    </div>
-
-    </section>
-
-    <!-- Goal weight -->
-    <section class="progress-section" id="goal">
-    <div class="card neon mb-4">
-        <div class="card-body">
-            <h5 class="mb-1">Goal weight</h5>
-            <p class="text-muted small mb-3">Adds a goal line to your chart and an estimated date. Your coach can adjust it too.</p>
-            <form th:action="@{/progress/goal}" method="post" class="row g-2">
-                <div class="col-8 col-md-3">
-                    <input class="form-control" type="number" name="goalWeight" step="0.1" min="70" max="700" placeholder="e.g. 175"
-                           th:value="${user.goalWeightLbs}">
-                </div>
-                <div class="col-4 col-md-2 d-grid">
-                    <button type="submit" class="btn btn-outline-neon">Save goal</button>
-                </div>
-            </form>
-        </div>
-    </div>
     </section>
 </div>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
 <script th:src="@{/js/progress-sections.js}"></script>
+<script th:src="@{/js/checkin.js}"></script>
 <script th:src="@{/webjars/chart.js/dist/chart.umd.min.js}"></script>
 <script th:src="@{/js/progress-charts.js}"></script>
 <script th:src="@{/js/measurements.js}"></script>

@@ -106,7 +106,8 @@
         const set = (key, text) => { form.querySelector('[data-review="' + key + '"]').textContent = text; };
         set('you', v('weight') + ' lb · ' + v('heightFeet') + "' " + v('heightInches') + '" · ' + v('age') + ' · ' + checkedLabel('sex'));
         set('activity', checkedLabel('activityLevel'));
-        set('goal', checkedLabel('fitnessGoal'));
+        const goalWeight = v('goalWeight').trim();
+        set('goal', checkedLabel('fitnessGoal') + (goalWeight ? ', goal weight ' + goalWeight + ' lb' : ''));
         set('style', isCustom()
             ? 'Custom: ' + sliderValue('proteinPercent') + '% protein, ' + sliderValue('carbsPercent') + '% carbs, ' + sliderValue('fatPercent') + '% fat'
             : checkedLabel('macroStyle'));

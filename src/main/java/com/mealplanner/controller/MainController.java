@@ -87,6 +87,7 @@ public class MainController {
             @RequestParam String fitnessGoal,
             @RequestParam(name = "bmrFormula", required = false, defaultValue = "mifflin-st-jeor") String bmrFormula,
             @RequestParam(name = "bodyFatPercentage", required = false) Double bodyFatPercentage,
+            @RequestParam(name = "goalWeight", required = false) Double goalWeight,
             @RequestParam(name = "macroStyle", required = false, defaultValue = UserProfile.STYLE_BALANCED) String macroStyle,
             @RequestParam(name = "proteinPercent", required = false, defaultValue = "30") int proteinPercent,
             @RequestParam(name = "carbsPercent", required = false, defaultValue = "40") int carbsPercent,
@@ -118,6 +119,7 @@ public class MainController {
         submitted.put("fitnessGoal", fitnessGoal);
         submitted.put("bmrFormula", bmrFormula);
         submitted.put("bodyFat", bodyFatPercentage);
+        submitted.put("goalWeight", goalWeight);
         submitted.put("macroStyle", macroStyle);
         submitted.put("proteinPercent", proteinPercent);
         submitted.put("carbsPercent", carbsPercent);
@@ -132,6 +134,9 @@ public class MainController {
         List<String> errors = validateInputs(weight, heightFeet, heightInches, age, sex, activityLevel, fitnessGoal);
         if (bodyFatPercentage != null && (bodyFatPercentage < 3 || bodyFatPercentage > 70)) {
             errors.add("Body fat must be between 3% and 70%.");
+        }
+        if (goalWeight != null && (goalWeight.isNaN() || goalWeight < 70 || goalWeight > 700)) {
+            errors.add("Goal weight must be between 70 and 700 lb.");
         }
         if (!UserProfile.MACRO_STYLES.contains(macroStyle)) errors.add("Pick a macro style.");
         if (!UserProfile.EFFORT_LEVELS.contains(effortLevel)) errors.add("Pick an effort level.");
@@ -165,6 +170,8 @@ public class MainController {
         user.setHealthConditions(healthKeys.isEmpty() ? null : healthKeys);
         user.setHealthNotes(notes == null || notes.isBlank() ? null : notes);
         if (user.getDisclaimerAcceptedAt() == null) user.setDisclaimerAcceptedAt(LocalDateTime.now());
+        // The form shows the current goal, so an empty box means the client cleared it.
+        user.setGoalWeightLbs(goalWeight == null ? null : Math.round(goalWeight * 10) / 10.0);
 
         LocalDate today = foodLogService.today(user);
         Integer rampWeek = null;
@@ -283,7 +290,6 @@ public class MainController {
         model.addAttribute("allergyOptions", allergyOptions());
         model.addAttribute("healthOptions", HealthCondition.values());
         model.addAttribute("needsDisclaimer", user.getDisclaimerAcceptedAt() == null);
-        model.addAttribute("goalWeight", user.getGoalWeightLbs());
         model.addAttribute("rampWeekNow", MacroCalculatorService.rampWeek(user.getRampStartDate(), foodLogService.today(user)));
     }
 
@@ -295,6 +301,7 @@ public class MainController {
                 "bodyFat", "otherAllergies")) {
             p.put(key, null);
         }
+        p.put("goalWeight", user.getGoalWeightLbs());
         p.put("macroStyle", UserProfile.STYLE_BALANCED);
         p.put("effortLevel", UserProfile.EFFORT_STANDARD);
         p.put("proteinPercent", 30);

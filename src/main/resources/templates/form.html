@@ -65,9 +65,6 @@
                         </div>
                     </div>
                 </div>
-                <p class="wizard-note" th:if="${goalWeight != null}">
-                    Your goal weight is <strong th:text="(${goalWeight % 1 == 0} ? ${#numbers.formatInteger(goalWeight, 1)} : ${goalWeight}) + ' lb'">165 lb</strong>, and protein is based on it. You can change it on the <a href="/progress#goal">Progress</a> page.
-                </p>
             </section>
 
             <!-- Step 2: activity and goal -->
@@ -102,6 +99,15 @@
                         </label>
                     </div>
                 </div>
+                <div class="row mt-3">
+                    <div class="col-8 col-md-4">
+                        <label class="form-label" for="goalWeight">Goal weight <span class="text-muted">(optional, lb)</span></label>
+                        <input type="number" class="form-control" id="goalWeight" name="goalWeight" min="70" max="700" step="0.1" placeholder="e.g. 170"
+                               th:value="${prefill.goalWeight != null and prefill.goalWeight % 1 == 0} ? ${#numbers.formatInteger(prefill.goalWeight, 1)} : ${prefill.goalWeight}">
+                        <div class="invalid-feedback">Between 70 and 700 lb.</div>
+                    </div>
+                </div>
+                <p class="wizard-note">Protein is based on your goal weight. It also shows on your Progress page.</p>
             </section>
 
             <!-- Step 3: how you eat -->

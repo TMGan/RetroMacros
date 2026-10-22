@@ -86,8 +86,19 @@ class PlanEngineFeatureTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("value=\"200\"")))
                 .andExpect(content().string(not(containsString("name=\"acceptDisclaimer\""))))
-                .andExpect(content().string(containsString("<strong>178 lb</strong>")))
+                .andExpect(content().string(containsString("value=\"178\"")))
                 .andExpect(content().string(containsString("Build my plan")));
+    }
+
+    @Test
+    void goalWeightCanBeSetInThePlanForm() throws Exception {
+        User client = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true").param("goalWeight", "185").with(signedInAs(client)))
+                .andExpect(status().isOk());
+        assertThat(userRepository.findById(client.getId()).orElseThrow().getGoalWeightLbs()).isEqualTo(185.0);
+
+        mvc.perform(plan().param("goalWeight", "20").with(signedInAs(client)))
+                .andExpect(content().string(containsString("Goal weight must be between 70 and 700 lb.")));
     }
 
     @Test
