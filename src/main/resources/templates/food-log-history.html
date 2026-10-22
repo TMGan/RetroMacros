@@ -12,48 +12,39 @@
 <body class="neon">
 <div th:replace="~{fragments/navbar :: authenticated-navbar}"></div>
 
-<div class="container my-5">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>📅 7-Day History</h1>
-        <a href="/dashboard" class="btn btn-primary">Back to Dashboard</a>
-    </div>
+<div class="container today">
+    <header class="today-head">
+        <div>
+            <h1 class="today-title">Past 7 days</h1>
+            <p class="today-date">What you logged each day, newest first.</p>
+        </div>
+        <a href="/dashboard" class="today-link"><i class="bi bi-arrow-left"></i> Today</a>
+    </header>
 
-    <div th:if="${foodLogs == null || foodLogs.isEmpty()}">
-        <p class="text-muted">No food logs found for the last 7 days.</p>
-    </div>
-
-    <div th:if="${foodLogs != null && !foodLogs.isEmpty()}">
-        <div th:each="date : ${dailyTotalsMap.keySet()}">
-            <div class="card neon mb-4">
-                <div class="card-header">
-                    <h4 th:text="${#temporals.format(date, 'EEEE, MMMM dd, yyyy')}">Date</h4>
-                    <div th:with="totals=${dailyTotalsMap.get(date)}">
-                        <strong>Daily Totals:</strong>
-                        <span th:text="${totals.get('calories')}">0</span> cal |
-                        <span th:text="${totals.get('protein')}">0</span>g P |
-                        <span th:text="${totals.get('carbs')}">0</span>g C |
-                        <span th:text="${totals.get('fat')}">0</span>g F
+    <section class="card neon">
+        <div class="card-body p-4">
+            <p class="text-muted mb-0" th:if="${foodLogs == null || foodLogs.isEmpty()}">Nothing logged in the last 7 days.</p>
+            <div th:if="${foodLogs != null && !foodLogs.isEmpty()}">
+                <div class="history-day" th:each="date : ${dailyTotalsMap.keySet()}" th:with="totals=${dailyTotalsMap.get(date)}">
+                    <div class="history-day-head">
+                        <h2 class="today-section-title" th:text="${#temporals.format(date, 'EEEE, MMM d')}">Wednesday, Oct 21</h2>
+                        <span class="log-macros" th:if="${totals.get('calories') > 0}"
+                              th:text="${totals.get('calories')} + ' cal · ' + ${totals.get('protein')} + 'P · ' + ${totals.get('carbs')} + 'C · ' + ${totals.get('fat')} + 'F'">1330 cal</span>
                     </div>
-                </div>
-                <div class="card-body table-responsive">
-                    <table class="table table-dark table-sm table-striped">
-                        <thead><tr><th>Time</th><th>Meal</th><th>Food</th><th>Cal</th><th>P</th><th>C</th><th>F</th></tr></thead>
-                        <tbody>
-                        <tr th:each="log : ${foodLogs}" th:if="${log.logDate.equals(date)}">
-                            <td th:text="${#temporals.format(log.timeLogged, 'h:mm a')}">8:00 AM</td>
-                            <td th:text="${log.mealName}">Breakfast</td>
-                            <td th:text="${log.foodDescription}">3 eggs, oatmeal</td>
-                            <td th:text="${log.calories}">0</td>
-                            <td th:text="${log.protein}">0</td>
-                            <td th:text="${log.carbs}">0</td>
-                            <td th:text="${log.fat}">0</td>
-                        </tr>
-                        </tbody>
-                    </table>
+                    <ul class="log-list" th:if="${totals.get('calories') > 0}">
+                        <li th:each="log : ${foodLogs}" th:if="${log.logDate.equals(date)}">
+                            <div class="log-main">
+                                <div class="log-meal"><span th:text="${log.mealName}">Lunch</span> · <span th:text="${#temporals.format(log.timeLogged, 'h:mm a')}">12:00 PM</span></div>
+                                <div class="log-desc" th:text="${log.foodDescription}">chicken and rice</div>
+                                <div class="log-macros" th:text="${log.calories} + ' cal · ' + ${log.protein} + 'P · ' + ${log.carbs} + 'C · ' + ${log.fat} + 'F'">710 cal</div>
+                            </div>
+                        </li>
+                    </ul>
+                    <p class="text-muted small mb-0" th:unless="${totals.get('calories') > 0}">Nothing logged.</p>
                 </div>
             </div>
         </div>
-    </div>
+    </section>
 </div>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>

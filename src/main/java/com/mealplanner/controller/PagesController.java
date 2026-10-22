@@ -20,8 +20,12 @@ public class PagesController {
     private final SavedMealPlanRepository savedMealPlanRepository;
 
     private final com.mealplanner.service.CurrentUserService currentUserService;
+    private final com.mealplanner.service.UserFoodPreferencesService preferencesService;
 
-    public PagesController(UserRepository userRepository, SavedMealPlanRepository savedMealPlanRepository, com.mealplanner.service.CurrentUserService currentUserService) {
+    public PagesController(UserRepository userRepository, SavedMealPlanRepository savedMealPlanRepository,
+                           com.mealplanner.service.CurrentUserService currentUserService,
+                           com.mealplanner.service.UserFoodPreferencesService preferencesService) {
+        this.preferencesService = preferencesService;
         this.currentUserService = currentUserService;
         this.userRepository = userRepository;
         this.savedMealPlanRepository = savedMealPlanRepository;
@@ -70,6 +74,7 @@ public class PagesController {
         model.addAttribute("daysAsMember", daysAsMember);
         model.addAttribute("memberSince", memberSince != null ? memberSince : "Unknown");
         model.addAttribute("lastLogin", lastLogin);
+        model.addAttribute("userPreferences", preferencesService.getUserPreferences(user));
         return "profile";
     }
 

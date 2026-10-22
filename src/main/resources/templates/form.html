@@ -3,256 +3,254 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Retro Macros - Input</title>
+    <title>Create Plan - Retro Macros</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Audiowide&display=swap" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/theme.css}" />
-    <style>
-        .choice-card { display: block; height: 100%; padding: 0.9rem 1rem; border: 1px solid rgba(0, 255, 255, 0.25); border-radius: 0.5rem; cursor: pointer; }
-        .choice-card:hover { border-color: rgba(0, 255, 255, 0.6); }
-        .choice-card input { margin-right: 0.5rem; }
-        .choice-card .choice-sub { display: block; margin-top: 0.25rem; font-size: 0.85rem; opacity: 0.75; }
-        input:checked + .choice-title { color: #2dd4ff; }
-    </style>
 </head>
 <body class="neon">
 <div th:replace="~{fragments/navbar :: authenticated-navbar}"></div>
 
-<div class="container mb-5">
+<div class="container plan-wizard my-4">
     <div th:if="${errors}" class="alert alert-danger">
         <ul class="mb-0">
             <li th:each="e : ${errors}" th:text="${e}"></li>
         </ul>
     </div>
 
-    <form th:action="@{/generate}" method="post" class="needs-validation" id="mealPlanForm" novalidate>
+    <!-- With errors from the server, open on the review step so nothing already entered is hidden. -->
+    <form th:action="@{/generate}" method="post" class="card neon" id="mealPlanForm" novalidate
+          th:attr="data-start-step=${errors != null} ? 5 : 1">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-        <div class="row g-3">
-            <div class="col-12">
-                <h4 class="mb-3 section-title">Personal Metrics</h4>
-                <p class="text-muted small mb-0" th:if="${prefill.weight != null}">Filled in from your last plan and latest weigh-in. Update anything that's changed.</p>
-            </div>
+        <div class="card-body p-4 p-md-5">
 
-            <div class="col-md-3">
-                <label for="weight" class="form-label">Weight (lbs)</label>
-                <input type="number" class="form-control" id="weight" name="weight" placeholder="e.g., 180" min="50" max="500" step="1" required th:value="${prefill.weight}">
-                <div class="invalid-feedback">Please enter a valid weight (50-500 lbs).</div>
-            </div>
-
-            <div class="col-md-2">
-                <label for="heightFeet" class="form-label">Height (feet)</label>
-                <input type="number" class="form-control" id="heightFeet" name="heightFeet" placeholder="e.g., 5" min="3" max="8" required th:value="${prefill.heightFeet}">
-                <div class="invalid-feedback">Enter feet between 3 and 8.</div>
-            </div>
-
-            <div class="col-md-2">
-                <label for="heightInches" class="form-label">Height (inches)</label>
-                <input type="number" class="form-control" id="heightInches" name="heightInches" placeholder="e.g., 10" min="0" max="11" required th:value="${prefill.heightInches}">
-                <div class="invalid-feedback">Enter inches between 0 and 11.</div>
-            </div>
-
-            <div class="col-md-2">
-                <label for="age" class="form-label">Age</label>
-                <input type="number" class="form-control" id="age" name="age" placeholder="e.g., 30" min="18" max="100" required th:value="${prefill.age}">
-                <div class="invalid-feedback">Please enter a valid age (18-100).</div>
-            </div>
-
-            <div class="col-md-3">
-                <label class="form-label">Sex</label>
-                <div class="d-flex gap-3">
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="sex" id="sexMale" value="Male" required th:checked="${prefill.sex == 'Male'}">
-                        <label class="form-check-label" for="sexMale">Male</label>
-                    </div>
-                    <div class="form-check">
-                        <input class="form-check-input" type="radio" name="sex" id="sexFemale" value="Female" required th:checked="${prefill.sex == 'Female'}">
-                        <label class="form-check-label" for="sexFemale">Female</label>
-                    </div>
+            <div class="wizard-head">
+                <div class="wizard-step-label"><span class="wizard-count">Step 1 of 5</span> · <span class="wizard-title">About you</span></div>
+                <div class="wizard-progress" aria-hidden="true">
+                    <span></span><span></span><span></span><span></span><span></span>
                 </div>
             </div>
 
-            <div class="col-12" th:if="${goalWeight != null}">
-                <small class="text-muted">Your goal weight is <strong th:text="${goalWeight} + ' lb'">165 lb</strong>. Protein is based on it. Change it on the <a href="/progress">Progress</a> page.</small>
-            </div>
+            <!-- Step 1: about you -->
+            <section class="form-step" data-step="1" data-title="About you">
+                <h2 class="wizard-heading">Let's start with you</h2>
+                <p class="wizard-sub" th:if="${prefill.weight != null}">Filled in from your last plan and latest weigh-in. Change anything that's different.</p>
+                <p class="wizard-sub" th:if="${prefill.weight == null}">This sets how much energy your body uses each day.</p>
+                <div class="row g-3">
+                    <div class="col-6 col-md-4">
+                        <label for="weight" class="form-label">Weight (lb)</label>
+                        <input type="number" class="form-control" id="weight" name="weight" placeholder="180" min="50" max="500" step="1" required th:value="${prefill.weight}">
+                        <div class="invalid-feedback">Between 50 and 500 lb.</div>
+                    </div>
+                    <div class="col-6 col-md-4">
+                        <label for="age" class="form-label">Age</label>
+                        <input type="number" class="form-control" id="age" name="age" placeholder="30" min="18" max="100" required th:value="${prefill.age}">
+                        <div class="invalid-feedback">Between 18 and 100.</div>
+                    </div>
+                    <div class="col-12 col-md-4">
+                        <label class="form-label" for="heightFeet">Height</label>
+                        <div class="input-group">
+                            <input type="number" class="form-control" id="heightFeet" name="heightFeet" placeholder="5" min="3" max="8" required th:value="${prefill.heightFeet}" aria-label="Feet">
+                            <span class="input-group-text">ft</span>
+                            <input type="number" class="form-control" id="heightInches" name="heightInches" placeholder="10" min="0" max="11" required th:value="${prefill.heightInches}" aria-label="Inches">
+                            <span class="input-group-text">in</span>
+                        </div>
+                    </div>
+                    <div class="col-12">
+                        <span class="form-label d-block">Sex</span>
+                        <div class="choice-row">
+                            <label class="choice-pill"><input type="radio" name="sex" value="Male" required th:checked="${prefill.sex == 'Male'}"><span>Male</span></label>
+                            <label class="choice-pill"><input type="radio" name="sex" value="Female" required th:checked="${prefill.sex == 'Female'}"><span>Female</span></label>
+                        </div>
+                    </div>
+                </div>
+                <p class="wizard-note" th:if="${goalWeight != null}">
+                    Your goal weight is <strong th:text="(${goalWeight % 1 == 0} ? ${#numbers.formatInteger(goalWeight, 1)} : ${goalWeight}) + ' lb'">165 lb</strong>, and protein is based on it. You can change it on the <a href="/progress#goal">Progress</a> page.
+                </p>
+            </section>
 
-            <div class="col-12 mt-4">
-                <h4 class="mb-3 section-title">Activity Level</h4>
-                <div class="row row-cols-1 row-cols-md-2 g-3">
+            <!-- Step 2: activity and goal -->
+            <section class="form-step" data-step="2" data-title="Activity &amp; goal">
+                <h2 class="wizard-heading">How active are you?</h2>
+                <p class="wizard-sub">Pick what matches a normal week, not your best week.</p>
+                <div class="row row-cols-1 row-cols-md-2 g-3 mb-4">
                     <div class="col" th:each="lvl : ${activityLevels}">
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="activityLevel" th:id="${'act-'+lvl}" th:value="${lvl}" required th:checked="${prefill.activityLevel == lvl}">
-                            <label class="form-check-label" th:for="${'act-'+lvl}" th:text="${lvl}"></label>
-                            <div class="form-text text-muted" th:switch="${lvl}">
-                                <small th:case="'Sedentary'">Desk job, little to no exercise</small>
-                                <small th:case="'Occasionally Active'">Light exercise 1-2 days/week</small>
-                                <small th:case="'Moderately Active'">Moderate exercise 3-5 days/week</small>
-                                <small th:case="'Very Active'">Hard exercise 6-7 days/week</small>
-                                <small th:case="*">Select the option that best matches your week</small>
-                            </div>
-                        </div>
+                        <label class="choice-card">
+                            <input type="radio" name="activityLevel" th:value="${lvl}" required th:checked="${prefill.activityLevel == lvl}">
+                            <span class="choice-title" th:text="${lvl}">Sedentary</span>
+                            <span class="choice-sub" th:switch="${lvl}">
+                                <th:block th:case="'Sedentary'">Desk job, little to no exercise</th:block>
+                                <th:block th:case="'Occasionally Active'">Light exercise 1 to 2 days a week</th:block>
+                                <th:block th:case="'Moderately Active'">Exercise 3 to 5 days a week</th:block>
+                                <th:block th:case="'Very Active'">Hard exercise 6 to 7 days a week</th:block>
+                            </span>
+                        </label>
                     </div>
                 </div>
-            </div>
-
-            <div class="col-12 mt-4">
-                <h4 class="mb-3 section-title">Fitness Goal</h4>
-                <div class="d-flex flex-wrap gap-4">
-                    <div class="form-check" th:each="g : ${goals}">
-                        <input class="form-check-input" type="radio" name="fitnessGoal" th:id="${'goal-'+g}" th:value="${g}" required th:checked="${prefill.fitnessGoal == g}">
-                        <label class="form-check-label" th:for="${'goal-'+g}" th:text="${g}"></label>
-                    </div>
-                </div>
-                <small class="form-text text-muted d-block mt-2">Fat loss uses a moderate 20% cut, never below what your body burns at rest. Building uses a small 10% surplus.</small>
-            </div>
-
-            <!-- Macro style -->
-            <div class="col-12 mt-4">
-                <h4 class="mb-2 section-title">How do you like to eat?</h4>
-                <p class="text-muted small">Your calories stay the same with every option. This only changes how they're split between protein, carbs and fat.</p>
+                <h2 class="wizard-heading">What's your goal?</h2>
                 <div class="row row-cols-1 row-cols-md-3 g-3">
-                    <div class="col">
-                        <label class="choice-card"><input type="radio" name="macroStyle" value="balanced" th:checked="${prefill.macroStyle == 'balanced'}"><strong class="choice-title">Balanced</strong>
-                            <span class="choice-sub">Recommended for most people. Moderate protein, carbs and fat.</span></label>
-                    </div>
-                    <div class="col">
-                        <label class="choice-card"><input type="radio" name="macroStyle" value="higher-protein" th:checked="${prefill.macroStyle == 'higher-protein'}"><strong class="choice-title">Higher protein</strong>
-                            <span class="choice-sub">More protein to protect and build muscle. Great if you lift.</span></label>
-                    </div>
-                    <div class="col">
-                        <label class="choice-card"><input type="radio" name="macroStyle" value="higher-carb" th:checked="${prefill.macroStyle == 'higher-carb'}"><strong class="choice-title">Higher carb</strong>
-                            <span class="choice-sub">A little less protein, more carbs. Easier if big portions of protein are hard.</span></label>
-                    </div>
-                    <div class="col">
-                        <label class="choice-card"><input type="radio" name="macroStyle" value="lower-carb" th:checked="${prefill.macroStyle == 'lower-carb'}"><strong class="choice-title">Lower carb</strong>
-                            <span class="choice-sub">Fewer carbs, more healthy fats.</span></label>
-                    </div>
-                    <div class="col">
-                        <label class="choice-card"><input type="radio" name="macroStyle" value="custom" th:checked="${prefill.macroStyle == 'custom'}"><strong class="choice-title">Custom</strong>
-                            <span class="choice-sub">Set your own percentages.</span></label>
+                    <div class="col" th:each="g : ${goals}">
+                        <label class="choice-card">
+                            <input type="radio" name="fitnessGoal" th:value="${g}" required th:checked="${prefill.fitnessGoal == g}">
+                            <span class="choice-title" th:text="${g}">Lose Weight</span>
+                            <span class="choice-sub" th:switch="${g}">
+                                <th:block th:case="'Lose Weight'">A moderate cut, never below what your body burns at rest</th:block>
+                                <th:block th:case="'Maintain Weight'">Eat to stay where you are</th:block>
+                                <th:block th:case="'Build Muscle'">A small surplus to build lean muscle</th:block>
+                            </span>
+                        </label>
                     </div>
                 </div>
+            </section>
 
-                <div class="card p-4 mt-3" id="customSplit" style="display: none; background-color: rgba(0, 255, 255, 0.05); border: 1px solid rgba(0, 255, 255, 0.3);">
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="mb-0" for="proteinPercent"><strong>Protein</strong></label>
-                            <span class="badge bg-primary" style="font-size: 1rem; padding: 0.5rem 1rem;"><span id="proteinPercentValue">30</span>%</span>
-                        </div>
+            <!-- Step 3: how you eat -->
+            <section class="form-step" data-step="3" data-title="How you eat">
+                <h2 class="wizard-heading">How do you like to eat?</h2>
+                <p class="wizard-sub">Your calories are the same with every option. This only changes the mix of protein, carbs and fat.</p>
+                <div class="row row-cols-1 row-cols-md-2 g-3">
+                    <div class="col">
+                        <label class="choice-card"><input type="radio" name="macroStyle" value="balanced" th:checked="${prefill.macroStyle == 'balanced'}">
+                            <span class="choice-title">Balanced <span class="choice-tag">Recommended</span></span>
+                            <span class="choice-sub">A moderate mix that works for most people</span></label>
+                    </div>
+                    <div class="col">
+                        <label class="choice-card"><input type="radio" name="macroStyle" value="higher-protein" th:checked="${prefill.macroStyle == 'higher-protein'}">
+                            <span class="choice-title">Higher protein</span>
+                            <span class="choice-sub">More protein to build and keep muscle</span></label>
+                    </div>
+                    <div class="col">
+                        <label class="choice-card"><input type="radio" name="macroStyle" value="higher-carb" th:checked="${prefill.macroStyle == 'higher-carb'}">
+                            <span class="choice-title">Higher carb</span>
+                            <span class="choice-sub">Less protein, more carbs, easier portions</span></label>
+                    </div>
+                    <div class="col">
+                        <label class="choice-card"><input type="radio" name="macroStyle" value="lower-carb" th:checked="${prefill.macroStyle == 'lower-carb'}">
+                            <span class="choice-title">Lower carb</span>
+                            <span class="choice-sub">Fewer carbs, more healthy fats</span></label>
+                    </div>
+                </div>
+                <label class="choice-link mt-3"><input type="radio" name="macroStyle" value="custom" th:checked="${prefill.macroStyle == 'custom'}">
+                    <span>Or set my own percentages</span></label>
+
+                <div class="custom-split mt-3" id="customSplit" hidden>
+                    <div class="split-row">
+                        <label for="proteinPercent">Protein</label>
                         <input type="range" class="form-range" id="proteinPercent" name="proteinPercent" min="20" max="50" step="5" th:value="${prefill.proteinPercent ?: 30}">
+                        <span class="split-value"><span id="proteinPercentValue">30</span>%</span>
                     </div>
-                    <div class="mb-4">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="mb-0" for="carbsPercent"><strong>Carbs</strong></label>
-                            <span class="badge bg-warning text-dark" style="font-size: 1rem; padding: 0.5rem 1rem;"><span id="carbsPercentValue">40</span>%</span>
-                        </div>
+                    <div class="split-row">
+                        <label for="carbsPercent">Carbs</label>
                         <input type="range" class="form-range" id="carbsPercent" name="carbsPercent" min="20" max="60" step="5" th:value="${prefill.carbsPercent ?: 40}">
+                        <span class="split-value"><span id="carbsPercentValue">40</span>%</span>
                     </div>
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <label class="mb-0" for="fatPercent"><strong>Fat</strong></label>
-                            <span class="badge bg-danger" style="font-size: 1rem; padding: 0.5rem 1rem;"><span id="fatPercentValue">30</span>%</span>
-                        </div>
+                    <div class="split-row">
+                        <label for="fatPercent">Fat</label>
                         <input type="range" class="form-range" id="fatPercent" name="fatPercent" min="20" max="45" step="5" th:value="${prefill.fatPercent ?: 30}">
+                        <span class="split-value"><span id="fatPercentValue">30</span>%</span>
                     </div>
-                    <div class="alert alert-success mb-0" id="totalAlert" role="alert">
-                        <strong>Total: <span id="totalPercent">100</span>%</strong> <span id="totalMessage"></span>
-                    </div>
-                    <small class="text-muted mt-2">Safety minimums still apply: enough protein to protect muscle, at least 20% fat, and at least 75 g of carbs.</small>
+                    <div class="split-total" id="totalAlert"><strong>Total <span id="totalPercent">100</span>%</strong> <span id="totalMessage"></span></div>
                 </div>
-            </div>
 
-            <!-- Effort level -->
-            <div class="col-12 mt-4">
-                <h4 class="mb-2 section-title">How much effort do you want to put into cooking?</h4>
+                <h2 class="wizard-heading mt-4">How much cooking do you want to do?</h2>
                 <div class="row row-cols-1 row-cols-md-3 g-3">
                     <div class="col">
-                        <label class="choice-card"><input type="radio" name="effortLevel" value="simple" th:checked="${prefill.effortLevel == 'simple'}"><strong class="choice-title">Keep it simple</strong>
-                            <span class="choice-sub">Same breakfast and lunch every day, 2 dinners, about 5 ingredients, under 10 minutes. Convenience foods welcome.</span></label>
+                        <label class="choice-card"><input type="radio" name="effortLevel" value="simple" th:checked="${prefill.effortLevel == 'simple'}">
+                            <span class="choice-title">Keep it simple</span>
+                            <span class="choice-sub">Repeat meals, about 5 ingredients, under 10 minutes</span></label>
                     </div>
                     <div class="col">
-                        <label class="choice-card"><input type="radio" name="effortLevel" value="standard" th:checked="${prefill.effortLevel == 'standard'}"><strong class="choice-title">Standard</strong>
-                            <span class="choice-sub">Practical home cooking, most meals in 15 to 30 minutes.</span></label>
+                        <label class="choice-card"><input type="radio" name="effortLevel" value="standard" th:checked="${prefill.effortLevel == 'standard'}">
+                            <span class="choice-title">Standard</span>
+                            <span class="choice-sub">Home cooking, 15 to 30 minutes</span></label>
                     </div>
                     <div class="col">
-                        <label class="choice-card"><input type="radio" name="effortLevel" value="cook" th:checked="${prefill.effortLevel == 'cook'}"><strong class="choice-title">I like to cook</strong>
-                            <span class="choice-sub">More variety and fuller recipes.</span></label>
+                        <label class="choice-card"><input type="radio" name="effortLevel" value="cook" th:checked="${prefill.effortLevel == 'cook'}">
+                            <span class="choice-title">I like to cook</span>
+                            <span class="choice-sub">More variety and fuller recipes</span></label>
                     </div>
                 </div>
-                <div class="form-check mt-3">
+                <label class="toggle-row mt-3">
                     <input class="form-check-input" type="checkbox" name="ramp" id="ramp" value="true" th:checked="${prefill.ramp}">
-                    <label class="form-check-label" for="ramp"><strong>Ease me in gradually</strong></label>
-                    <div class="form-text text-muted">Start close to what you eat now and step toward your full targets over 4 weeks.
-                        <span th:if="${rampWeekNow != null}" th:text="'You are in week ' + ${rampWeekNow} + ' of 4.'"></span></div>
-                </div>
-            </div>
+                    <span><strong>Ease me in gradually</strong>
+                        <span class="choice-sub">Step toward your full targets over 4 weeks.<th:block th:if="${rampWeekNow != null}" th:text="' You are in week ' + ${rampWeekNow} + ' of 4.'"></th:block></span></span>
+                </label>
+            </section>
 
-            <!-- BMR formula -->
-            <div class="col-12 mt-4">
-                <details>
-                    <summary class="text-muted">Advanced: calorie formula</summary>
-                    <div class="mt-3 mb-3">
-                        <label class="form-label" for="bmrFormula">BMR Calculation Formula</label>
-                        <select class="form-select" name="bmrFormula" id="bmrFormula">
-                            <option value="mifflin-st-jeor" th:selected="${prefill.bmrFormula == null or prefill.bmrFormula == 'mifflin-st-jeor'}">Mifflin-St Jeor (Recommended)</option>
-                            <option value="harris-benedict" th:selected="${prefill.bmrFormula == 'harris-benedict'}">Harris-Benedict (Classic)</option>
-                            <option value="katch-mcardle" th:selected="${prefill.bmrFormula == 'katch-mcardle'}">Katch-McArdle (needs body fat %)</option>
-                        </select>
-                    </div>
-                    <div class="mb-3" id="bodyFatField">
-                        <label class="form-label" for="bodyFatPercentage">Body Fat Percentage</label>
-                        <input type="number" class="form-control" name="bodyFatPercentage" id="bodyFatPercentage" min="5" max="50" step="0.1" placeholder="e.g., 18.5" th:value="${prefill.bodyFat}">
-                        <small class="form-text text-muted">Required for Katch-McArdle.</small>
+            <!-- Step 4: allergies and health -->
+            <section class="form-step" data-step="4" data-title="Allergies &amp; health">
+                <h2 class="wizard-heading">Any allergies?</h2>
+                <p class="wizard-sub">Your plan will never include these. Skip it if none apply.</p>
+                <div class="choice-row mb-3">
+                    <label class="choice-pill" th:each="a : ${allergyOptions}">
+                        <input type="checkbox" name="allergies" th:value="${a}" th:checked="${prefill.allergies != null and #lists.contains(prefill.allergies, a)}">
+                        <span th:text="${a}">Dairy</span>
+                    </label>
+                </div>
+                <label for="otherAllergies" class="form-label">Anything else? <span class="text-muted">(comma-separated)</span></label>
+                <input type="text" id="otherAllergies" name="otherAllergies" class="form-control" maxlength="200" placeholder="e.g. tomatoes, lactose" th:value="${prefill.otherAllergies}">
+
+                <h2 class="wizard-heading mt-4">Health check</h2>
+                <p class="wizard-sub">Check anything that applies. Your plan is adjusted and your coach will follow up. Skip it if none apply.</p>
+                <div class="health-list">
+                    <label class="toggle-row" th:each="h : ${healthOptions}">
+                        <input class="form-check-input" type="checkbox" name="healthConditions" th:value="${h.key}"
+                               th:checked="${prefill.healthConditions != null and #lists.contains(prefill.healthConditions, h.key)}">
+                        <span th:text="${h.label}">Condition</span>
+                    </label>
+                </div>
+                <label for="healthNotes" class="form-label mt-3">Anything else your coach should know? <span class="text-muted">(optional)</span></label>
+                <textarea id="healthNotes" name="healthNotes" class="form-control" rows="2" maxlength="300"
+                          placeholder="e.g. high blood pressure, recent surgery" th:text="${prefill.healthNotes}"></textarea>
+            </section>
+
+            <!-- Step 5: review -->
+            <section class="form-step" data-step="5" data-title="Review">
+                <h2 class="wizard-heading">Look good?</h2>
+                <p class="wizard-sub">Check your answers, then build your plan. It takes about a minute.</p>
+                <dl class="review-list" id="reviewList">
+                    <div><dt>You</dt><dd data-review="you">-</dd><dd><button type="button" class="review-edit" data-goto="1">Edit</button></dd></div>
+                    <div><dt>Activity</dt><dd data-review="activity">-</dd><dd><button type="button" class="review-edit" data-goto="2">Edit</button></dd></div>
+                    <div><dt>Goal</dt><dd data-review="goal">-</dd><dd><button type="button" class="review-edit" data-goto="2">Edit</button></dd></div>
+                    <div><dt>Eating style</dt><dd data-review="style">-</dd><dd><button type="button" class="review-edit" data-goto="3">Edit</button></dd></div>
+                    <div><dt>Cooking</dt><dd data-review="effort">-</dd><dd><button type="button" class="review-edit" data-goto="3">Edit</button></dd></div>
+                    <div><dt>Allergies</dt><dd data-review="allergies">-</dd><dd><button type="button" class="review-edit" data-goto="4">Edit</button></dd></div>
+                    <div><dt>Health</dt><dd data-review="health">-</dd><dd><button type="button" class="review-edit" data-goto="4">Edit</button></dd></div>
+                </dl>
+
+                <details class="advanced">
+                    <summary>Advanced: calorie formula</summary>
+                    <div class="row g-3 mt-1">
+                        <div class="col-md-7">
+                            <label class="form-label" for="bmrFormula">Formula</label>
+                            <select class="form-select" name="bmrFormula" id="bmrFormula">
+                                <option value="mifflin-st-jeor" th:selected="${prefill.bmrFormula == null or prefill.bmrFormula == 'mifflin-st-jeor'}">Mifflin-St Jeor (recommended)</option>
+                                <option value="harris-benedict" th:selected="${prefill.bmrFormula == 'harris-benedict'}">Harris-Benedict</option>
+                                <option value="katch-mcardle" th:selected="${prefill.bmrFormula == 'katch-mcardle'}">Katch-McArdle (needs body fat %)</option>
+                            </select>
+                        </div>
+                        <div class="col-md-5">
+                            <label class="form-label" for="bodyFatPercentage">Body fat %</label>
+                            <input type="number" class="form-control" name="bodyFatPercentage" id="bodyFatPercentage" min="5" max="50" step="0.1" placeholder="e.g. 18.5" th:value="${prefill.bodyFat}">
+                            <div class="invalid-feedback">Needed for Katch-McArdle (5 to 50).</div>
+                        </div>
                     </div>
                 </details>
-            </div>
 
-            <!-- Allergies -->
-            <div class="col-12 mt-4">
-                <h4 class="mb-3 section-title">Allergies & Restrictions</h4>
-                <div class="d-flex flex-wrap gap-4">
-                    <div class="form-check" th:each="a : ${allergyOptions}">
-                        <input class="form-check-input" type="checkbox" name="allergies" th:id="${'alg-'+a}" th:value="${a}"
-                               th:checked="${prefill.allergies != null and #lists.contains(prefill.allergies, a)}">
-                        <label class="form-check-label" th:for="${'alg-'+a}" th:text="${a}"></label>
-                    </div>
-                </div>
-                <div class="mt-3">
-                    <label for="otherAllergies" class="form-label">Other (comma-separated)</label>
-                    <textarea id="otherAllergies" name="otherAllergies" class="form-control" rows="2" placeholder="e.g., tomatoes, bell peppers, lactose" th:text="${prefill.otherAllergies}"></textarea>
-                </div>
-            </div>
-
-            <!-- Health screen -->
-            <div class="col-12 mt-4">
-                <h4 class="mb-2 section-title">Health check</h4>
-                <p class="text-muted small">Check anything that applies. Your plan will be adjusted, and your coach will follow up with you. Leave it blank if none apply.</p>
-                <div class="form-check mb-2" th:each="h : ${healthOptions}">
-                    <input class="form-check-input" type="checkbox" name="healthConditions" th:id="${'health-'+h.key}" th:value="${h.key}"
-                           th:checked="${prefill.healthConditions != null and #lists.contains(prefill.healthConditions, h.key)}">
-                    <label class="form-check-label" th:for="${'health-'+h.key}" th:text="${h.label}"></label>
-                </div>
-                <div class="mt-3">
-                    <label for="healthNotes" class="form-label">Anything else your coach should know? <span class="text-muted">(optional)</span></label>
-                    <textarea id="healthNotes" name="healthNotes" class="form-control" rows="2" maxlength="300"
-                              placeholder="e.g., high blood pressure, recent surgery, medications that affect appetite" th:text="${prefill.healthNotes}"></textarea>
-                </div>
-            </div>
-
-            <div class="col-12 mt-4" th:if="${needsDisclaimer}">
-                <div class="form-check">
+                <label class="toggle-row mt-4" th:if="${needsDisclaimer}">
                     <input class="form-check-input" type="checkbox" name="acceptDisclaimer" id="acceptDisclaimer" value="true" required>
-                    <label class="form-check-label" for="acceptDisclaimer">
-                        I have read the <a href="/disclaimer" target="_blank">disclaimer</a>. I understand this is not medical advice and I'll check with my doctor before changing my diet or starting a supplement.
-                    </label>
-                    <div class="invalid-feedback">Please accept the disclaimer to continue.</div>
-                </div>
-            </div>
+                    <span>I've read the <a href="/disclaimer" target="_blank">disclaimer</a> and understand this isn't medical advice.</span>
+                </label>
+            </section>
 
-            <div class="col-12 mt-4">
-                <button id="submitBtn" type="submit" class="btn btn-neon btn-lg">
+            <div class="step-error" role="alert" hidden></div>
+
+            <div class="wizard-nav">
+                <button type="button" class="btn btn-outline-neon" data-wizard="back">Back</button>
+                <button type="button" class="btn btn-neon" data-wizard="next">Next</button>
+                <button id="submitBtn" type="submit" class="btn btn-neon">
                     <span class="spinner-border spinner-border-sm me-2 d-none" role="status" aria-hidden="true"></span>
-                    <span>Generate My Meal Plan</span>
+                    <span>Build my plan</span>
                 </button>
             </div>
         </div>
@@ -260,7 +258,7 @@
 </div>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
-<script th:src="@{/js/macro-sliders.js}"></script>
+<script th:src="@{/js/plan-form.js}"></script>
 <div th:replace="~{fragments/footer :: footer}"></div>
 </body>
 </html>

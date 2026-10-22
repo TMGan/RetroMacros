@@ -213,7 +213,8 @@ public class FoodLogController {
     public String viewHistory(@AuthenticationPrincipal OAuth2User principal, HttpSession session, Model model) {
         User user = currentUserService.requireForView(principal, session);
         List<FoodLog> last7Days = foodLogService.getLast7DaysFoodLogs(user);
-        Map<LocalDate, Map<String, Integer>> dailyTotalsMap = new HashMap<>();
+        // Insertion order is newest day first, which is the order the page lists them in.
+        Map<LocalDate, Map<String, Integer>> dailyTotalsMap = new java.util.LinkedHashMap<>();
         LocalDate today = foodLogService.today(user);
         for (int i = 0; i < 7; i++) {
             LocalDate date = today.minusDays(i);
