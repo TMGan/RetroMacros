@@ -43,7 +43,7 @@ public class PreferencesController {
                 limit(cookingPreference, MAX_CHOICE_LENGTH),
                 limit(dietaryStyle, MAX_CHOICE_LENGTH));
         redirectAttributes.addFlashAttribute("success", "Food preferences saved!");
-        return "redirect:/dashboard";
+        return "redirect:/profile#preferences";
     }
 
     private String limit(String value, int max) {

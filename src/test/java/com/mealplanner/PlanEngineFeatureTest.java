@@ -180,6 +180,24 @@ class PlanEngineFeatureTest {
     }
 
     @Test
+    void foodPreferencesLiveOnTheProfilePage() throws Exception {
+        User client = invitedClient();
+        mvc.perform(post("/preferences/save").param("preferredFoods", "salmon, rice").param("avoidedFoods", "mushrooms")
+                        .param("cookingPreference", "mixed").param("dietaryStyle", "pescatarian")
+                        .with(signedInAs(client)).with(csrf()))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/profile#preferences"));
+
+        mvc.perform(get("/profile").with(signedInAs(client)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("salmon, rice")))
+                .andExpect(content().string(containsString("value=\"pescatarian\" selected")));
+        mvc.perform(get("/dashboard").with(signedInAs(client)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("Log food")))
+                .andExpect(content().string(not(containsString("salmon, rice"))));
+    }
+
+    @Test
     void disclaimerIsPublic() throws Exception {
         mvc.perform(get("/disclaimer"))
                 .andExpect(status().isOk())

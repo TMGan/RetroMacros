@@ -12,72 +12,68 @@
 <body class="neon">
 <div th:replace="~{fragments/navbar :: authenticated-navbar}"></div>
 
-<div class="container my-5">
-    <div class="row">
-        <div class="col-lg-8 mx-auto">
-            <h1 class="mb-4 section-title">My Profile</h1>
+<div class="container my-5" style="max-width: 760px;">
+    <div th:if="${success}" class="alert alert-success" th:text="${success}">Saved</div>
 
-            <div class="card neon mb-4"><div class="card-body">
-                <div class="row align-items-center">
-                    <div class="col-md-3 text-center">
-                        <div th:if="${user.profilePictureUrl != null}">
-                            <img th:src="${user.profilePictureUrl}" alt="Profile" class="rounded-circle img-fluid" style="max-width:150px; object-fit:cover;">
-                        </div>
-                        <div th:unless="${user.profilePictureUrl != null}">
-                            <i class="bi bi-dumbbell" style="font-size:72px;color:var(--neon-cyan, #00d9ff); text-shadow:0 0 8px rgba(0,217,255,0.8), 0 0 16px rgba(0,217,255,0.6);"></i>
-                        </div>
-                    </div>
-                    <div class="col-md-9">
-                        <h3 th:text="${user.name}">User Name</h3>
-                        <p class="text-muted mb-2"><i class="bi bi-envelope"></i> <span th:text="${user.email}">email@example.com</span></p>
-                        <p class="text-muted mb-2">
-                            <i class="bi bi-calendar"></i>
-                            Member since
-                            <span th:text="${memberSince}">Date</span>
-                        </p>
-                        <p class="text-muted" th:if="${lastLogin != null}">
-                            <i class="bi bi-clock"></i>
-                            Last login <span th:text="${lastLogin}">Date</span>
-                        </p>
-                        <p class="text-muted" th:unless="${lastLogin != null}">
-                            <i class="bi bi-clock"></i>
-                            Last login <span>Never</span>
-                        </p>
-                    </div>
-                </div>
-            </div></div>
-
-            <div class="card neon mb-4"><div class="card-body">
-                <h4 class="card-title section-title">Account Statistics</h4>
-                <div class="row text-center">
-                    <div class="col-md-4"><div class="border rounded p-3">
-                        <h2 class="text-primary mb-0" th:text="${totalPlans}">0</h2>
-                        <p class="text-muted mb-0">Meal Plans Created</p>
-                    </div></div>
-                    <div class="col-md-4"><div class="border rounded p-3">
-                        <h2 class="text-primary mb-0"><span th:text="${daysAsMember}">0</span></h2>
-                        <p class="text-muted mb-0">Days as Member</p>
-                    </div></div>
-                    <div class="col-md-4"><div class="border rounded p-3">
-                        <h2 class="text-success mb-0"><i class="bi bi-check-circle"></i></h2>
-                        <p class="text-muted mb-0">Account Status: Active</p>
-                    </div></div>
-                </div>
-            </div></div>
-
-            <div class="card neon"><div class="card-body">
-                <h4 class="card-title section-title">Quick Actions</h4>
-                <div class="d-grid gap-2">
-                    <a href="/form" class="btn btn-neon"><i class="bi bi-plus-circle"></i> Create New Meal Plan</a>
-                    <a href="/my-plans" class="btn btn-outline-neon"><i class="bi bi-journal-text"></i> View My Plans</a>
-                    <form th:action="@{/logout}" method="post" style="display:inline;">
-                        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-                        <button type="submit" class="btn btn-outline-danger w-100"><i class="bi bi-box-arrow-right"></i> Sign Out</button>
-                    </form>
-                </div>
-            </div></div>
+    <!-- Who you are -->
+    <section class="card neon mb-4">
+        <div class="card-body p-4 profile-head">
+            <img th:if="${user.profilePictureUrl != null}" th:src="${user.profilePictureUrl}" alt="" class="profile-photo">
+            <div th:unless="${user.profilePictureUrl != null}" class="profile-photo profile-initial" th:text="${#strings.substring(user.name, 0, 1)}">D</div>
+            <div class="flex-grow-1">
+                <h1 class="profile-name" th:text="${user.name}">User Name</h1>
+                <div class="profile-meta" th:text="${user.email}">email@example.com</div>
+                <div class="profile-meta" th:text="'Member since ' + ${memberSince} + ' · ' + ${totalPlans} + (${totalPlans == 1} ? ' plan' : ' plans')">Member since</div>
+            </div>
+            <form th:action="@{/logout}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <button type="submit" class="btn btn-sm btn-outline-neon"><i class="bi bi-box-arrow-right"></i> Sign out</button>
+            </form>
         </div>
-    </div>
+    </section>
+
+    <!-- Food preferences: used every time a plan is made -->
+    <section class="card neon" id="preferences">
+        <div class="card-body p-4">
+            <h2 class="wizard-heading">Food preferences</h2>
+            <p class="wizard-sub">Your plans use these every time. Allergies are asked separately when you make a plan.</p>
+            <form th:action="@{/preferences/save}" method="post">
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <div class="mb-3">
+                    <label class="form-label" for="preferredFoods">Foods you like</label>
+                    <textarea class="form-control" id="preferredFoods" name="preferredFoods" rows="2" maxlength="1000"
+                              placeholder="e.g. chicken, salmon, rice, sweet potatoes, berries" th:text="${userPreferences?.preferredFoodsText}"></textarea>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label" for="avoidedFoods">Foods to leave out</label>
+                    <textarea class="form-control" id="avoidedFoods" name="avoidedFoods" rows="2" maxlength="1000"
+                              placeholder="e.g. mushrooms, tofu, quinoa" th:text="${userPreferences?.avoidedFoodsText}"></textarea>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="cookingPreference">How you usually eat</label>
+                        <select class="form-select" id="cookingPreference" name="cookingPreference" th:with="cp=${userPreferences?.cookingPreference}">
+                            <option value="mostly-home-cooked" th:selected="${cp == 'mostly-home-cooked'}">Mostly home-cooked</option>
+                            <option value="mixed" th:selected="${cp == 'mixed'}">Mix of home-cooked and eating out</option>
+                            <option value="convenience-focused" th:selected="${cp == 'convenience-focused'}">Convenience first (meal prep, frozen, eating out)</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="dietaryStyle">Diet style</label>
+                        <select class="form-select" id="dietaryStyle" name="dietaryStyle" th:with="ds=${userPreferences?.dietaryStyle}">
+                            <option value="flexible" th:selected="${ds == 'flexible'}">Flexible</option>
+                            <option value="mostly-whole-foods" th:selected="${ds == 'mostly-whole-foods'}">Mostly whole foods</option>
+                            <option value="whole-foods-only" th:selected="${ds == 'whole-foods-only' or ds == 'clean-eating'}">Whole foods only</option>
+                            <option value="vegetarian" th:selected="${ds == 'vegetarian'}">Vegetarian</option>
+                            <option value="vegan" th:selected="${ds == 'vegan'}">Vegan</option>
+                            <option value="pescatarian" th:selected="${ds == 'pescatarian'}">Pescatarian</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="text-end mt-4"><button type="submit" class="btn btn-neon">Save preferences</button></div>
+            </form>
+        </div>
+    </section>
 </div>
 
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
