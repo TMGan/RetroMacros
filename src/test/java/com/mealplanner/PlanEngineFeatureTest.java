@@ -71,19 +71,23 @@ class PlanEngineFeatureTest {
                 .andExpect(content().string(containsString("How do you like to eat?")))
                 .andExpect(content().string(containsString("Kidney disease")))
                 .andExpect(content().string(containsString("name=\"acceptDisclaimer\"")))
-                .andExpect(content().string(containsString("Generate My Meal Plan")));
+                .andExpect(content().string(containsString("Build my plan")));
     }
 
     @Test
     void formRendersFullyFromAClientsHistory() throws Exception {
         User client = invitedClient();
         mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
+        User saved = userRepository.findById(client.getId()).orElseThrow();
+        saved.setGoalWeightLbs(178.0);
+        userRepository.save(saved);
 
         mvc.perform(get("/form").with(signedInAs(client)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("value=\"200\"")))
                 .andExpect(content().string(not(containsString("name=\"acceptDisclaimer\""))))
-                .andExpect(content().string(containsString("Generate My Meal Plan")));
+                .andExpect(content().string(containsString("<strong>178 lb</strong>")))
+                .andExpect(content().string(containsString("Build my plan")));
     }
 
     @Test

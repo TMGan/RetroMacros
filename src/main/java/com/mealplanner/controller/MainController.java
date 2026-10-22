@@ -108,7 +108,8 @@ public class MainController {
 
         // What the form shows again if something is wrong.
         Map<String, Object> submitted = new HashMap<>();
-        submitted.put("weight", weight);
+        // Whole pounds show as "182", not "182.0".
+        submitted.put("weight", weight == Math.rint(weight) ? (Object) Math.round(weight) : weight);
         submitted.put("heightFeet", heightFeet);
         submitted.put("heightInches", heightInches);
         submitted.put("age", age);
