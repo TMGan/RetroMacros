@@ -104,7 +104,7 @@
                     <div class="log-main">
                         <div class="log-meal"><span th:text="${log.mealName}">Lunch</span> · <span th:text="${#temporals.format(log.timeLogged, 'h:mm a')}">12:00 PM</span></div>
                         <div class="log-desc" th:text="${log.foodDescription}">chicken and rice</div>
-                        <div class="log-macros" th:text="${log.calories} + ' cal · ' + ${log.protein} + 'P · ' + ${log.carbs} + 'C · ' + ${log.fat} + 'F'">710 cal</div>
+                        <div class="log-macros" th:text="${log.calories} + ' cal · ' + ${log.protein} + 'g protein · ' + ${log.carbs} + 'g carbs · ' + ${log.fat} + 'g fat'">710 cal</div>
                     </div>
                     <form th:action="@{/food-log/delete/{id}(id=${log.id})}" method="post" th:unless="${impersonating}">
                         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />

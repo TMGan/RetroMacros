@@ -1,7 +1,7 @@
 /* Admin pages: built on theme.css so they match the main app. Only admin-specific bits live here. */
 
 .admin-tag {
-  font-family: system-ui, sans-serif;
+  font-family: var(--font);
   font-size: 0.7rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;

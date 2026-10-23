@@ -137,7 +137,7 @@
                         <li th:each="fi : ${meal.foods}" th:attr="data-item=${fi.item}"><span class="portion" th:text="${fi.portion}">3 large</span> <span th:text="${fi.item}">Scrambled eggs</span></li>
                     </ul>
                     <footer class="meal-foot">
-                        <span class="meal-macros" th:text="${meal.macros.calories} + ' cal · ' + ${meal.macros.protein} + 'P · ' + ${meal.macros.carbs} + 'C · ' + ${meal.macros.fat} + 'F'">520 cal · 32P · 58C · 18F</span>
+                        <span class="meal-macros" th:text="${meal.macros.calories} + ' cal · ' + ${meal.macros.protein} + 'g protein · ' + ${meal.macros.carbs} + 'g carbs · ' + ${meal.macros.fat} + 'g fat'">520 cal · 32g protein · 58g carbs · 18g fat</span>
                         <button type="button" class="btn btn-sm btn-outline-neon" data-action="recipe" th:if="${meal.recipe != null}"
                                 th:attr="data-recipe-name=${meal.recipe.name},
                                          data-ingredients=${#strings.arrayJoin(meal.recipe.ingredients.toArray(), '||')},

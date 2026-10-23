@@ -29,14 +29,14 @@
                     <div class="history-day-head">
                         <h2 class="today-section-title" th:text="${#temporals.format(date, 'EEEE, MMM d')}">Wednesday, Oct 21</h2>
                         <span class="log-macros" th:if="${totals.get('calories') > 0}"
-                              th:text="${totals.get('calories')} + ' cal · ' + ${totals.get('protein')} + 'P · ' + ${totals.get('carbs')} + 'C · ' + ${totals.get('fat')} + 'F'">1330 cal</span>
+                              th:text="${totals.get('calories')} + ' cal · ' + ${totals.get('protein')} + 'g protein · ' + ${totals.get('carbs')} + 'g carbs · ' + ${totals.get('fat')} + 'g fat'">1330 cal</span>
                     </div>
                     <ul class="log-list" th:if="${totals.get('calories') > 0}">
                         <li th:each="log : ${foodLogs}" th:if="${log.logDate.equals(date)}">
                             <div class="log-main">
                                 <div class="log-meal"><span th:text="${log.mealName}">Lunch</span> · <span th:text="${#temporals.format(log.timeLogged, 'h:mm a')}">12:00 PM</span></div>
                                 <div class="log-desc" th:text="${log.foodDescription}">chicken and rice</div>
-                                <div class="log-macros" th:text="${log.calories} + ' cal · ' + ${log.protein} + 'P · ' + ${log.carbs} + 'C · ' + ${log.fat} + 'F'">710 cal</div>
+                                <div class="log-macros" th:text="${log.calories} + ' cal · ' + ${log.protein} + 'g protein · ' + ${log.carbs} + 'g carbs · ' + ${log.fat} + 'g fat'">710 cal</div>
                             </div>
                         </li>
                     </ul>

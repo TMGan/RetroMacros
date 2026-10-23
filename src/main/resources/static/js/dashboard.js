@@ -90,7 +90,7 @@
             name.textContent = data.foodDescription;
             const macros = document.createElement('div');
             macros.className = 'log-idea-macros';
-            macros.textContent = data.calories + ' cal · ' + data.protein + 'P · ' + data.carbs + 'C · ' + data.fat + 'F';
+            macros.textContent = data.calories + ' cal · ' + data.protein + 'g protein · ' + data.carbs + 'g carbs · ' + data.fat + 'g fat';
             const list = document.createElement('ul');
             (data.ingredients || []).forEach(t => { const li = document.createElement('li'); li.textContent = t; list.appendChild(li); });
             box.append(name, macros, list);
