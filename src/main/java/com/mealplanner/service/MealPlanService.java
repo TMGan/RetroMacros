@@ -21,7 +21,7 @@ public class MealPlanService {
     private static final String MEAL_SCHEMA = """
             {"name": string, "type": "breakfast" | "lunch" | "dinner" | "snack", "foods": [{"item": string, "portion": string}], \
             "macros": {"calories": number, "protein": number, "carbs": number, "fat": number, "fiber": number}, \
-            "recipe": {"name": string, "ingredients": [string], "instructions": [string], \
+            "recipe": {"name": string, "instructions": [string], \
             "prepTime": string, "cookTime": string, "totalTime": string}}""";
 
     private final AiClient aiClient;
@@ -91,7 +91,33 @@ public class MealPlanService {
         }
         // Day totals always come from the meals, never from the model's own arithmetic.
         PlanQualityCheck.recomputeTotals(plan);
+        if (plan.getDays() != null) {
+            plan.getDays().forEach(day -> { if (day.getMeals() != null) day.getMeals().forEach(MealPlanService::fillRecipeIngredients); });
+        }
         return plan;
+    }
+
+    /**
+     * The model doesn't repeat ingredients in the recipe (it was doubling the size of every plan),
+     * so the recipe's ingredient list is built from the meal's foods.
+     */
+    static void fillRecipeIngredients(Meal meal) {
+        if (meal == null || meal.getRecipe() == null) return;
+        List<String> ingredients = meal.getRecipe().getIngredients();
+        if (ingredients != null && !ingredients.isEmpty()) return;
+        List<String> fromFoods = new ArrayList<>();
+        if (meal.getFoods() != null) {
+            for (FoodItem f : meal.getFoods()) {
+                String line = (safeText(f.getPortion()) + " " + safeText(f.getItem())).trim();
+                if (!line.isEmpty()) fromFoods.add(line);
+            }
+        }
+        meal.getRecipe().setIngredients(fromFoods);
+        if (meal.getRecipe().getInstructions() == null) meal.getRecipe().setInstructions(new ArrayList<>());
+    }
+
+    private static String safeText(String s) {
+        return s == null ? "" : s.trim();
     }
 
     public boolean isMockMode() {
@@ -237,7 +263,9 @@ public class MealPlanService {
 
         p.append("FORMAT:\n")
          .append("- 3 days. Each day has breakfast, lunch, dinner and 1 or 2 snacks. Set each meal's \"type\".\n")
-         .append("- Each meal has a recipe with ingredient quantities, short clear steps, and prep, cook and total time.\n")
+         .append("- Each meal has a short recipe: brief steps plus prep, cook and total time. Don't list the ingredients again; ")
+         .append("the foods list is the ingredient list.\n")
+         .append("- Keep the JSON compact: only the fields shown, no comments.\n")
          .append("- Return ONLY a JSON object, no prose and no code fences, in exactly this shape:\n")
          .append("{\"days\": [{\"day\": number, \"meals\": [").append(MEAL_SCHEMA).append("], ")
          .append("\"dailyTotals\": {\"calories\": number, \"protein\": number, \"carbs\": number, \"fat\": number, \"fiber\": number}}]}\n");
@@ -321,6 +349,7 @@ public class MealPlanService {
                 throw new AiClient.AiException("We couldn't find a swap that avoids your allergies. Please try again.", null);
             }
         }
+        fillRecipeIngredients(meal);
         return meal;
     }
 
@@ -345,7 +374,8 @@ public class MealPlanService {
         }
         p.append("If it replaces a breakfast, lunch or dinner, include at least one vegetable as its own item in \"foods\". ")
          .append("Mostly whole foods. Food only: no supplements except a named protein shake.\n");
-        p.append("Use realistic cooked portions and USDA FoodData Central values. Include a practical recipe with quantities and 3 to 5 steps.\n");
+        p.append("Use realistic cooked portions and USDA FoodData Central values. Include a short recipe with 3 to 5 brief steps; ")
+         .append("the foods list is the ingredient list.\n");
         p.append("Return ONLY a JSON object, no prose and no code fences, in exactly this shape:\n").append(MEAL_SCHEMA).append("\n");
         return p.toString();
     }

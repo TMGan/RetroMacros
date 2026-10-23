@@ -26,7 +26,7 @@ public class ChallengeService {
             new String[]{"Vegetables with every meal", "Add a vegetable to each main meal. Frozen and pre-cut count too."},
             new String[]{"Water and sleep", "Drink your water target and aim for a regular bedtime. Both make the rest easier."},
             new String[]{"Keep it going", "Keep logging and checking in, even on busy days. Rough estimates are fine."},
-            new String[]{"Finish strong", "Do a final check-in and, if you like, take your measurements to see how far you've come."});
+            new String[]{"Finish strong", "Do a final weigh-in on the Progress page to see how far you've come."});
 
     private final String name;
     private final LocalDate start;

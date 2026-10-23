@@ -38,8 +38,7 @@ public class ProgressController {
     static final java.util.List<String[]> SECTIONS = java.util.List.of(
             new String[]{"checkin", "Check in", "bi-check2-circle"},
             new String[]{"overview", "Overview", "bi-speedometer2"},
-            new String[]{"charts", "Charts", "bi-graph-up"},
-            new String[]{"measurements", "Measurements", "bi-rulers"});
+            new String[]{"charts", "Charts", "bi-graph-up"});
 
     private final ProgressService progressService;
     private final MeasurementService measurementService;

@@ -74,9 +74,6 @@
     <a class="today-nudge" th:if="${!rampNewWeek and checkInDue}" href="/progress#checkin">
         <i class="bi bi-graph-up-arrow"></i> <span>Time for a check-in. Log your weight.</span>
     </a>
-    <a class="today-nudge" th:if="${!rampNewWeek and !checkInDue and measurementsDue}" href="/progress#measurements">
-        <i class="bi bi-rulers"></i> <span>Time for your monthly measurements.</span>
-    </a>
 
     <!-- Today's numbers -->
     <section class="card neon mb-4" th:if="${latestPlan != null}"

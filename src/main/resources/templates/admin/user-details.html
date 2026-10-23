@@ -87,7 +87,7 @@
     <div th:unless="${summary.hasData}" class="card neon mb-4"><div class="card-body empty-state">No check-ins yet.</div></div>
     <th:block th:replace="~{fragments/progress :: stats(${summary})}"></th:block>
     <th:block th:if="${summary.hasData}"><th:block th:replace="~{fragments/progress :: charts(${chartJson})}"></th:block></th:block>
-    <th:block th:replace="~{fragments/progress :: details(${summary}, ${msummary})}"></th:block>
+    <th:block th:replace="~{fragments/progress :: details(${summary}, ${msummary}, true)}"></th:block>
 
     <div class="row g-3 mb-4">
         <div class="col-12 col-lg-8">

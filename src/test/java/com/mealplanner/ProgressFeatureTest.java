@@ -108,7 +108,10 @@ class ProgressFeatureTest {
         mvc.perform(get("/progress").with(signedInAs(alice)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("186.2")))
-                .andExpect(content().string(containsString("Lean vs fat mass")))
+                .andExpect(content().string(containsString("Your habits")))
+                // Body composition and feelings are for the coach's view only.
+                .andExpect(content().string(not(containsString("Lean vs fat mass"))))
+                .andExpect(content().string(not(containsString("How you've been feeling"))))
                 .andExpect(content().string(containsString("chart.umd.min.js")));
         mvc.perform(get("/progress").with(signedInAs(bob)))
                 .andExpect(status().isOk())
@@ -214,7 +217,7 @@ class ProgressFeatureTest {
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        for (String id : java.util.List.of("checkin", "overview", "charts", "measurements")) {
+        for (String id : java.util.List.of("checkin", "overview", "charts")) {
             assertThat(html).contains("data-section=\"" + id + "\"");
             assertThat(html).contains("<section class=\"progress-section\" id=\"" + id + "\"");
         }

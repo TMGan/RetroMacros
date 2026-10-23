@@ -30,7 +30,8 @@ public class AiClient {
 
     /** What a call is for. Decides the model, output allowance and effort. */
     public enum Kind {
-        PLAN(true, 16000), PLAN_REPAIR(true, 16000), SWAP(true, 8000),
+        // Plans write 3 days of meals with recipes plus the model's own thinking; 16k ran out on fuller plans.
+        PLAN(true, 32000), PLAN_REPAIR(true, 32000), SWAP(true, 8000),
         ESTIMATE(false, 2000), SUGGESTION(false, 4000);
 
         final boolean usesPlanModel;
@@ -63,7 +64,7 @@ public class AiClient {
     public AiClient(AiCallLogRepository aiCallLogRepository,
                     Environment env,
                     @Value("${ai.api.key:}") String apiKey,
-                    @Value("${ai.timeout.ms:120000}") long timeoutMs,
+                    @Value("${ai.timeout.ms:300000}") long timeoutMs,
                     @Value("${ai.model.plan:claude-sonnet-5-5}") String planModel,
                     @Value("${ai.model.log:claude-haiku-5-5}") String logModel,
                     @Value("${ai.effort.plan:low}") String planEffort,
@@ -75,7 +76,8 @@ public class AiClient {
         this.planEffort = effort(planEffort);
         this.logEffort = effort(logEffort);
         this.client = (apiKey == null || apiKey.isBlank()) ? null
-                : AnthropicOkHttpClient.builder().apiKey(apiKey).timeout(Duration.ofMillis(timeoutMs)).build();
+                // One retry at most: a slow plan retried twice more would be billed up to three times.
+                : AnthropicOkHttpClient.builder().apiKey(apiKey).timeout(Duration.ofMillis(timeoutMs)).maxRetries(1).build();
     }
 
     public boolean isConfigured() {

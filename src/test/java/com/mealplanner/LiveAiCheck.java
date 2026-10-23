@@ -4,30 +4,37 @@ import com.mealplanner.model.*;
 import com.mealplanner.repository.AiCallLogRepository;
 import com.mealplanner.repository.UserRepository;
 import com.mealplanner.service.AllergenGuard;
-import com.mealplanner.service.FoodLogService;
+import com.mealplanner.service.MacroCalculatorService;
 import com.mealplanner.service.MealPlanService;
+import com.mealplanner.service.PlanQualityCheck;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.TestInstance;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
+import java.util.EnumSet;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Calls the real Anthropic API. Costs real money (a few cents), so it only runs
- * when RUN_LIVE_AI=true and CLAUDE_API_KEY are set:
+ * Calls the real Anthropic API to check whole plans end to end: targets, prompt,
+ * code checks and cost. Costs real money (roughly 10 to 20 cents per plan), so it
+ * only runs when RUN_LIVE_AI=true. The key comes from CLAUDE_API_KEY or from the
+ * git-ignored application-local.properties (ai.api.key=...):
  *   RUN_LIVE_AI=true ./mvnw test -Dtest=LiveAiCheck
  */
 @EnabledIfEnvironmentVariable(named = "RUN_LIVE_AI", matches = "true")
-@SpringBootTest(properties = {"GOOGLE_CLIENT_ID=test", "GOOGLE_CLIENT_SECRET=test", "ai.mock=false"})
+@SpringBootTest(properties = {"GOOGLE_CLIENT_ID=test", "GOOGLE_CLIENT_SECRET=test", "ai.mock=false",
+        "spring.config.import=optional:file:./application-local.properties"})
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class LiveAiCheck {
 
     @Autowired private MealPlanService mealPlanService;
-    @Autowired private FoodLogService foodLogService;
+    @Autowired private MacroCalculatorService macroService;
     @Autowired private UserRepository userRepository;
     @Autowired private AiCallLogRepository aiCallLogRepository;
 
@@ -37,48 +44,84 @@ class LiveAiCheck {
     }
 
     @Test
-    void realCallsWorkAndAreCostTracked() {
-        User user = newUser();
-
-        long t0 = System.currentTimeMillis();
-        Map<String, Integer> estimate = foodLogService.estimateMacrosWithAI(user, "3 scrambled eggs and 2 slices of whole wheat toast", false);
-        System.out.println("LIVE estimate: " + estimate + " in " + (System.currentTimeMillis() - t0) + " ms");
-        assertThat(estimate).isNotNull();
-
-        t0 = System.currentTimeMillis();
-        Map<String, Object> idea = foodLogService.generateRandomHealthyMeal(user, 550, false, List.of("Dairy"), null);
-        System.out.println("LIVE random meal (no dairy): " + idea + " in " + (System.currentTimeMillis() - t0) + " ms");
-        assertThat(idea).isNotNull();
-
-        MacroTargets targets = new MacroTargets(2200, 180, 220, 70);
-        UserProfile profile = new UserProfile(180, 5, 10, 30, "male", "Moderately Active", "Build Muscle", List.of("Fish", "Shellfish"));
-        String prefs = "CLIENT'S FOOD PREFERENCES:\n- Foods they like and want: chicken, ground beef, rice, potatoes, eggs\n"
-                + "- Foods to avoid: mushrooms\nTreat the foods to avoid as a hard rule, the same as an allergy.\n";
-        t0 = System.currentTimeMillis();
-        MealPlan plan;
-        try {
-            plan = mealPlanService.generateMealPlan(user, profile, targets, prefs);
-        } finally {
-            printCosts();
-        }
-        long planMs = System.currentTimeMillis() - t0;
-
-        System.out.println("LIVE plan in " + planMs + " ms, allergen hits: " + AllergenGuard.violations(List.of("Fish", "Shellfish", "mushrooms"), plan));
-        for (Day day : plan.getDays()) {
-            System.out.println("LIVE day " + day.getDayNumber() + " totals " + fmt(day.getDailyTotal()));
-            for (Meal meal : day.getMeals()) {
-                System.out.println("LIVE   " + meal.getName() + ": " + (meal.getRecipe() != null ? meal.getRecipe().getName() : "") + " " + fmt(meal.getMacros()));
-            }
-        }
-        assertThat(plan.getDays()).hasSize(3);
-
+    void simpleModeFatLoss() {
+        UserProfile p = new UserProfile(165, 5, 5, 42, "Female", "Occasionally Active", "Lose Weight", List.of());
+        p.setEffortLevel(UserProfile.EFFORT_SIMPLE);
+        run("1. Simple mode, fat loss, ramp week 1", p, 1, null);
     }
 
-    private void printCosts() {
-        aiCallLogRepository.findAll().forEach(log -> System.out.println("LIVE cost: " + log.getKind() + " " + log.getModel()
-                + " in=" + log.getInputTokens() + " out=" + log.getOutputTokens() + " $" + (log.getCostMicros() / 1_000_000.0)
-                + " " + log.getDurationMs() + "ms success=" + log.isSuccess() + (log.getErrorType() == null ? "" : " error=" + log.getErrorType())));
-        System.out.println("LIVE total cost: $" + (aiCallLogRepository.sumCostMicros() / 1_000_000.0));
+    @Test
+    void dairyAllergyBuildingMuscle() {
+        UserProfile p = new UserProfile(175, 5, 11, 29, "Male", "Very Active", "Build Muscle", List.of("Dairy"));
+        p.setMacroStyle(UserProfile.STYLE_HIGH_PROTEIN);
+        run("2. Dairy allergy, build, higher protein", p, null, null);
+    }
+
+    @Test
+    void diabetesOnMedication() {
+        UserProfile p = new UserProfile(230, 5, 9, 61, "Male", "Sedentary", "Lose Weight", List.of());
+        p.setHealthConditions(EnumSet.of(HealthCondition.DIABETES_MEDS));
+        p.setHealthNotes("high blood pressure, takes metformin");
+        run("3. Health check: diabetes on medication", p, null, null);
+    }
+
+    @Test
+    void lowerCarbGlutenFreeCook() {
+        UserProfile p = new UserProfile(150, 5, 6, 35, "Female", "Moderately Active", "Maintain Weight", List.of("Gluten/Wheat"));
+        p.setMacroStyle(UserProfile.STYLE_LOW_CARB);
+        p.setEffortLevel(UserProfile.EFFORT_COOK);
+        String prefs = "CLIENT'S FOOD PREFERENCES:\n- Foods they like and want: salmon, chicken thighs, sweet potatoes, berries\n"
+                + "- Foods to avoid: mushrooms\nTreat the foods to avoid as a hard rule, the same as an allergy.\n";
+        run("4. Lower carb, gluten-free, likes to cook", p, null, prefs);
+    }
+
+    private void run(String title, UserProfile profile, Integer rampWeek, String prefs) {
+        User user = newUser();
+        NutritionTargets nutrition = macroService.buildTargets(profile, rampWeek);
+        MacroTargets targets = nutrition.toMacroTargets();
+        StringBuilder out = new StringBuilder("\n===== LIVE " + title + " =====\n");
+        out.append("Targets: ").append(fmt(targets)).append(" fiber ").append(targets.getFiber())
+           .append("g (maintenance ").append(nutrition.getMaintenanceCalories()).append(", hold=").append(nutrition.isHealthHold()).append(")\n");
+
+        long t0 = System.currentTimeMillis();
+        MealPlan plan = mealPlanService.generateMealPlan(user, profile, targets, prefs);
+        out.append("Built in ").append((System.currentTimeMillis() - t0) / 1000).append("s\n");
+
+        List<String> avoid = new java.util.ArrayList<>(profile.getAllergies());
+        if (prefs != null && prefs.contains("mushrooms")) avoid.add("mushrooms");
+        out.append("Allergen hits: ").append(AllergenGuard.violations(avoid, plan)).append('\n');
+        out.append("Problems after checks: ").append(PlanQualityCheck.problems(plan, targets)).append('\n');
+        out.append("Accuracy score: ").append(PlanQualityCheck.accuracyScore(plan, targets)).append('\n');
+        for (Day day : plan.getDays()) {
+            out.append("Day ").append(day.getDayNumber()).append(": ").append(fmt(day.getDailyTotal()))
+               .append(" fiber ").append(day.getDailyTotal().getFiber()).append('\n');
+            for (Meal meal : day.getMeals()) {
+                out.append("   [").append(meal.getType()).append("] ").append(meal.getName()).append(" (").append(fmt(meal.getMacros())).append(")\n      ");
+                meal.getFoods().forEach(f -> out.append(f.getPortion()).append(' ').append(f.getItem()).append("; "));
+                out.append('\n');
+            }
+        }
+        out.append(costs(user));
+        System.out.println(out);
+
+        assertThat(AllergenGuard.violations(avoid, plan)).isEmpty();
+        assertThat(plan.getDays()).hasSize(3);
+    }
+
+    private String costs(User user) {
+        StringBuilder sb = new StringBuilder();
+        aiCallLogRepository.findAll().stream().filter(l -> l.getUser() != null && l.getUser().getId().equals(user.getId()))
+                .forEach(l -> sb.append("Call: ").append(l.getKind()).append(' ').append(l.getModel())
+                        .append(" in=").append(l.getInputTokens()).append(" out=").append(l.getOutputTokens())
+                        .append(" $").append(l.getCostMicros() / 1_000_000.0).append(' ').append(l.getDurationMs() / 1000).append("s")
+                        .append(l.isSuccess() ? "" : " FAILED " + l.getErrorType()).append('\n'));
+        sb.append("Plan cost: $").append(aiCallLogRepository.sumCostMicrosForUser(user) / 1_000_000.0).append('\n');
+        return sb.toString();
+    }
+
+    @AfterAll
+    void totalCost() {
+        System.out.println("\n===== LIVE total cost of this run: $" + aiCallLogRepository.sumCostMicros() / 1_000_000.0 + " =====");
     }
 
     private String fmt(MacroTargets m) {
