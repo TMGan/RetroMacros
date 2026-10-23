@@ -205,15 +205,20 @@ public class MainController {
         }
         MacroTargets targets = nutrition.toMacroTargets();
 
+        // A plan that fails to build hands its uses back, so a hiccup never costs one of the client's weekly plans.
+        boolean saveCounted = false;
+        boolean planCounted = false;
         try {
             // Every plan is saved, so cap saves for every account, including the public demo.
             aiQuotaService.consume(user, AiQuotaService.Kind.PLAN_SAVE);
+            saveCounted = true;
             MealPlan mealPlan;
             if (currentUserService.isDemo(user)) {
                 // The shared demo account never spends API tokens.
                 mealPlan = mealPlanService.generateSampleMealPlan(profile, targets);
             } else {
                 aiQuotaService.consume(user, AiQuotaService.Kind.PLAN);
+                planCounted = true;
                 String preferencesExtra = preferencesService.buildPreferencesPrompt(user);
                 String learnedExtra = swapService.buildLearnedPreferencesPrompt(user);
                 String combinedExtra = (preferencesExtra == null ? "" : preferencesExtra) + "\n" + (learnedExtra == null ? "" : learnedExtra);
@@ -265,16 +270,24 @@ public class MainController {
             model.addAttribute("groceryList", groceryList);
             return "results"; // templates/results.html
         } catch (AiQuotaService.QuotaExceededException ex) {
+            refundUses(user, saveCounted, planCounted);
             return formWithErrors(model, user, submitted, List.of(ex.getMessage()));
         } catch (AiClient.AiException ex) {
+            refundUses(user, saveCounted, planCounted);
             // These messages are written to be shown to clients (allergy refusals, outages, spend limits).
             log.warn("Meal plan generation failed for user {}: {}", user.getId(), ex.getMessage());
             return formWithErrors(model, user, submitted, List.of(ex.getMessage()));
         } catch (Exception ex) {
+            refundUses(user, saveCounted, planCounted);
             // Details stay in the server log; they can include raw provider responses.
             log.warn("Meal plan generation failed for user {}", user.getId(), ex);
             return formWithErrors(model, user, submitted, List.of("We couldn't generate your meal plan right now. Please try again in a minute."));
         }
+    }
+
+    private void refundUses(User user, boolean saveCounted, boolean planCounted) {
+        if (saveCounted) aiQuotaService.refund(user, AiQuotaService.Kind.PLAN_SAVE);
+        if (planCounted) aiQuotaService.refund(user, AiQuotaService.Kind.PLAN);
     }
 
     private String formWithErrors(Model model, User user, Map<String, Object> submitted, List<String> errors) {

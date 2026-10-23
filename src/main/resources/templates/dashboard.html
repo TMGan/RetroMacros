@@ -21,13 +21,50 @@
             <h1 class="today-title">Today</h1>
             <p class="today-date" th:text="${#temporals.format(#temporals.createToday(), 'EEEE, MMMM d')} + ' · ' + ${user.name}">Tuesday, October 21 · Name</p>
         </div>
-        <button type="button" class="btn btn-neon" data-bs-toggle="modal" data-bs-target="#logFoodModal" th:unless="${impersonating}">
+        <button type="button" class="btn btn-neon" data-bs-toggle="modal" data-bs-target="#logFoodModal" th:unless="${impersonating or (challenge != null and challenge.readOnly)}">
             <i class="bi bi-plus-lg"></i> Log food
         </button>
     </header>
 
     <div th:if="${success}" class="alert alert-success" th:text="${success}">Saved</div>
     <div th:if="${error}" class="alert alert-danger" th:text="${error}">Error</div>
+    <div th:if="${challenge != null and challenge.readOnly}" class="alert alert-info">
+        The challenge has ended. Everything you logged is still here to look back on, but you can't add anything new. Talk to your coach to keep going.
+    </div>
+
+    <!-- Where the challenge is -->
+    <a class="today-banner" href="/challenge" th:if="${challenge != null and !challenge.readOnly}">
+        <span><i class="bi bi-trophy"></i> <strong th:text="${challenge.name}">6-Week Challenge</strong>
+            <span th:if="${challenge.notStarted}" th:text="' · starts in ' + ${challenge.daysToStart} + (${challenge.daysToStart == 1} ? ' day' : ' days')"> · starts Monday</span>
+            <span th:if="${challenge.running}" th:text="' · week ' + ${challenge.week} + ' of ' + ${challenge.weeks} + ': ' + ${challenge.focusTitle}"> · week 2 of 6</span>
+            <span th:if="${challenge.finished}"> · finished</span></span>
+        <i class="bi bi-chevron-right"></i>
+    </a>
+
+    <!-- Getting started: shows until all three are done -->
+    <section class="card neon mb-4" th:if="${showStarter}">
+        <div class="card-body p-4">
+            <h2 class="wizard-heading">Getting started</h2>
+            <p class="wizard-sub">Three things to do this week. Each one ticks off when it's done.</p>
+            <ol class="starter-list">
+                <li th:classappend="${starterPlan} ? 'done'">
+                    <span class="starter-check"><i class="bi bi-check-lg" th:if="${starterPlan}"></i><th:block th:unless="${starterPlan}">1</th:block></span>
+                    <span><span class="starter-title">Make your food plan</span>
+                        <span class="starter-how d-block">Tap <a href="/form">Create Plan</a> and answer a few questions. It takes about 3 minutes, then about a minute to build.</span></span>
+                </li>
+                <li th:classappend="${starterLog} ? 'done'">
+                    <span class="starter-check"><i class="bi bi-check-lg" th:if="${starterLog}"></i><th:block th:unless="${starterLog}">2</th:block></span>
+                    <span><span class="starter-title">Log something you ate</span>
+                        <span class="starter-how d-block">Tap <strong>Log food</strong> at the top of this page. Pick a meal from your plan, or type what you ate and tap Estimate.</span></span>
+                </li>
+                <li th:classappend="${starterCheckIn} ? 'done'">
+                    <span class="starter-check"><i class="bi bi-check-lg" th:if="${starterCheckIn}"></i><th:block th:unless="${starterCheckIn}">3</th:block></span>
+                    <span><span class="starter-title">Do your first check-in</span>
+                        <span class="starter-how d-block">Weigh yourself in the morning, then enter it on the <a href="/progress#checkin">Progress</a> page.</span></span>
+                </li>
+            </ol>
+        </div>
+    </section>
 
     <!-- At most one nudge at a time, most useful first. -->
     <a class="today-nudge" th:if="${rampNewWeek}" href="/form">

@@ -649,6 +649,55 @@ a:hover { color: var(--neon-purple); text-shadow: 0 0 6px rgba(45,212,255,0.6); 
 .history-day + .history-day { margin-top: 20px; padding-top: 20px; border-top: 1px solid rgba(167, 139, 250, 0.18); }
 .history-day-head { display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 6px 12px; margin-bottom: 10px; }
 
+/* Challenge page */
+.challenge-weeks { display: flex; gap: 6px; margin-top: 10px; }
+.challenge-weeks span { flex: 1; height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.08); }
+.challenge-weeks span.done { background: var(--neon-purple); }
+.challenge-weeks span.now { background: var(--neon-blue); }
+.routine { padding-left: 1.2rem; margin: 0; font-size: 1.02rem; line-height: 1.6; }
+.routine li { margin-bottom: 12px; }
+.routine li:last-child { margin-bottom: 0; }
+.week-list { list-style: none; padding: 0; margin: 0; }
+.week-list li { display: flex; gap: 16px; padding: 12px 0; border-top: 1px solid rgba(167, 139, 250, 0.12); }
+.week-list li:first-child { border-top: 0; padding-top: 0; }
+.week-list li.now .week-num { color: var(--neon-blue); }
+.week-num { flex: 0 0 64px; color: var(--muted); font-size: 0.9rem; padding-top: 1px; }
+.today-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(167, 139, 250, 0.3);
+  color: var(--text);
+  text-decoration: none;
+  font-size: 0.95rem;
+}
+.today-banner:hover { border-color: var(--neon-purple); color: var(--text); }
+.today-banner .bi { color: var(--neon-purple); }
+
+/* Getting started checklist */
+.starter-list { list-style: none; padding: 0; margin: 0; }
+.starter-list li { display: flex; align-items: flex-start; gap: 12px; padding: 12px 0; border-top: 1px solid rgba(167, 139, 250, 0.12); }
+.starter-list li:first-child { border-top: 0; padding-top: 0; }
+.starter-check {
+  flex: 0 0 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid rgba(167, 139, 250, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-weight: 600;
+}
+.starter-list li.done .starter-check { border-color: var(--success); background: rgba(32, 227, 178, 0.15); color: var(--success); }
+.starter-list li.done .starter-title { color: var(--muted); text-decoration: line-through; }
+.starter-title { font-weight: 600; font-size: 1.02rem; }
+.starter-how { color: var(--muted); font-size: 0.92rem; }
+
 /* Profile */
 .profile-head { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
 .profile-photo { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; }

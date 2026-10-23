@@ -41,6 +41,7 @@ class PlanEngineFeatureTest {
     @Autowired private AllowedEmailRepository allowedEmailRepository;
     @Autowired private SavedMealPlanRepository savedMealPlanRepository;
     @Autowired private com.mealplanner.service.UserFoodPreferencesService preferencesService;
+    @Autowired private com.mealplanner.service.AiQuotaService aiQuotaService;
 
     private User invitedClient() {
         String email = UUID.randomUUID() + "@example.com";
@@ -206,6 +207,63 @@ class PlanEngineFeatureTest {
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("Log food")))
                 .andExpect(content().string(not(containsString("salmon, rice"))));
+    }
+
+    @Test
+    void afterAccessEndsEverythingIsReadOnly() throws Exception {
+        User client = invitedClient();
+        client.setAccessUntil(java.time.LocalDate.now().minusDays(1));
+        userRepository.save(client);
+
+        // Looking is fine.
+        mvc.perform(get("/dashboard").with(signedInAs(client)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("The challenge has ended")))
+                .andExpect(content().string(not(containsString("data-bs-target=\"#logFoodModal\""))));
+        mvc.perform(get("/progress").with(signedInAs(client))).andExpect(status().isOk());
+
+        // Making or saving anything is not: page forms go back to Today, the page's fetch calls get an error.
+        mvc.perform(plan().param("acceptDisclaimer", "true").header("Accept", "text/html").with(signedInAs(client)))
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl("/dashboard?ended"));
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client)).isEmpty();
+        mvc.perform(post("/food-log/estimate-macros").param("foodDescription", "two eggs").with(signedInAs(client)).with(csrf()))
+                .andExpect(status().isForbidden())
+                .andExpect(content().string(containsString("read-only")));
+
+        // The coach extends them and they're back in.
+        client.setAccessUntil(java.time.LocalDate.now().plusDays(30));
+        userRepository.save(client);
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client)).hasSize(1);
+    }
+
+    @Test
+    void aFailedPlanDoesNotUseUpOneOfTheWeeklyPlans() throws Exception {
+        User client = invitedClient();
+        // The offline sample plan contains dairy, so this fails the same way an AI outage would.
+        mvc.perform(plan().param("acceptDisclaimer", "true").param("allergies", "Dairy").with(signedInAs(client)))
+                .andExpect(content().string(containsString("Dairy")));
+        assertThat(aiQuotaService.plansThisWeek(client)).isZero();
+
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
+        assertThat(aiQuotaService.plansThisWeek(client)).isEqualTo(1);
+    }
+
+    @Test
+    void challengePageShowsTheRoutineAndWeeklyPlanCount() throws Exception {
+        mvc.perform(get("/challenge").with(signedInAs(invitedClient())))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("6-Week Challenge")))
+                .andExpect(content().string(containsString("Your routine")))
+                .andExpect(content().string(containsString("You have used 0 of 2 this week.")));
+    }
+
+    @Test
+    void dashboardShowsTheGettingStartedChecklistUntilDone() throws Exception {
+        User client = invitedClient();
+        mvc.perform(get("/dashboard").with(signedInAs(client)))
+                .andExpect(content().string(containsString("Getting started")))
+                .andExpect(content().string(containsString("Make your food plan")));
     }
 
     @Test

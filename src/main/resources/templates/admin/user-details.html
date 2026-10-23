@@ -121,6 +121,14 @@
                     <input class="form-control" type="number" name="goalWeight" step="0.1" min="70" max="700" th:value="${user.goalWeightLbs}" placeholder="lb">
                     <button type="submit" class="btn btn-outline-neon">Save</button>
                 </form>
+                <h5 class="mb-1 mt-4">Access until</h5>
+                <p class="text-muted small mb-3">After this day the client can still look but not add anything. Leave blank for the challenge default.</p>
+                <div th:if="${param.accessSaved}" class="alert alert-success py-2">Saved.</div>
+                <form th:action="@{/admin/users/{id}/access(id=${user.id})}" method="post" class="d-flex gap-2">
+                    <input class="form-control" type="date" name="accessUntil" th:value="${user.accessUntil}">
+                    <button type="submit" class="btn btn-outline-neon">Save</button>
+                </form>
+                <small class="text-muted d-block mt-2" th:text="'Currently: ' + ${#temporals.format(accessEnd, 'MMM d, yyyy')}">Currently</small>
             </div></div>
         </div>
     </div>

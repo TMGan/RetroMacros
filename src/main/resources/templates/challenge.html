@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Challenge - Retro Macros</title>
+    <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Audiowide&display=swap" rel="stylesheet">
+    <link rel="stylesheet" th:href="@{/css/theme.css}" />
+</head>
+<body class="neon">
+<div th:replace="~{fragments/navbar :: authenticated-navbar}"></div>
+
+<div class="container today" th:with="c=${challenge}">
+    <header class="today-head">
+        <div>
+            <h1 class="today-title" th:text="${c.name}">6-Week Challenge</h1>
+            <p class="today-date" th:text="${#temporals.format(c.start, 'MMMM d')} + ' to ' + ${#temporals.format(c.end, 'MMMM d, yyyy')}">October 26 to December 6</p>
+        </div>
+    </header>
+
+    <!-- Where we are -->
+    <section class="card neon mb-4">
+        <div class="card-body p-4">
+            <th:block th:if="${c.notStarted}">
+                <div class="stat-label">Starts Monday</div>
+                <div class="today-big" th:text="${c.daysToStart} + (${c.daysToStart == 1} ? ' day to go' : ' days to go')">3 days to go</div>
+                <p class="text-muted mt-2 mb-0">Use these days to get set up: make your food plan and try logging a meal or two.</p>
+            </th:block>
+            <th:block th:if="${c.running}">
+                <div class="stat-label" th:text="'Week ' + ${c.week} + ' of ' + ${c.weeks}">Week 2 of 6</div>
+                <div class="challenge-weeks" aria-hidden="true">
+                    <span th:each="i : ${#numbers.sequence(1, c.weeks)}" th:classappend="${i < c.week} ? ' done' : (${i == c.week} ? ' now' : '')"></span>
+                </div>
+                <p class="text-muted mt-2 mb-0" th:text="${c.daysLeft} + (${c.daysLeft == 1} ? ' day left' : ' days left') + ' in the challenge.'">33 days left</p>
+            </th:block>
+            <th:block th:if="${c.finished}">
+                <div class="stat-label">The challenge is over</div>
+                <div class="today-big">Well done for taking part</div>
+                <p class="text-muted mt-2 mb-0" th:if="${!c.readOnly}" th:text="'You can keep using everything until ' + ${#temporals.format(c.accessEnd, 'MMMM d')} + '. Do a final check-in to see your results.'">Final check-in</p>
+                <p class="text-muted mt-2 mb-0" th:if="${c.readOnly}">Everything you logged is still here to look back on. Talk to your coach if you'd like to keep going.</p>
+            </th:block>
+        </div>
+    </section>
+
+    <!-- This week -->
+    <section class="card neon mb-4" th:unless="${c.finished}">
+        <div class="card-body p-4">
+            <div class="stat-label" th:text="${c.notStarted} ? 'Week 1 focus' : 'Focus this week'">Focus this week</div>
+            <h2 class="wizard-heading mt-1" th:text="${c.focusTitle}">Protein at every meal</h2>
+            <p class="mb-0" th:text="${c.focusText}">Try to include protein</p>
+        </div>
+    </section>
+
+    <!-- The routine, in plain words -->
+    <section class="card neon mb-4">
+        <div class="card-body p-4">
+            <h2 class="wizard-heading">Your routine</h2>
+            <ol class="routine">
+                <li><strong>Every day:</strong> log what you eat on the <a href="/dashboard">Today</a> page. Tap <em>Log food</em>, then pick a meal from your plan or type what you ate.</li>
+                <li><strong>Once a week or more:</strong> weigh in on the <a href="/progress#checkin">Progress</a> page, first thing in the morning.</li>
+                <li><strong>Up to <span th:text="${plansPerWeek}">2</span> food plans a week:</strong> make a new one under <a href="/form">Create Plan</a> when you want new meals.
+                    <span class="text-muted" th:text="'You have used ' + ${plansUsed} + ' of ' + ${plansPerWeek} + ' this week.'">You have used 1 of 2 this week.</span></li>
+                <li><strong>Once a month, if you like:</strong> take your measurements on the Progress page.</li>
+            </ol>
+        </div>
+    </section>
+
+    <!-- All six weeks -->
+    <section class="card neon">
+        <div class="card-body p-4">
+            <h2 class="wizard-heading">The six weeks</h2>
+            <ol class="week-list">
+                <li th:each="w, iter : ${c.allWeeks}" th:classappend="${iter.count == c.week} ? 'now' : ''">
+                    <span class="week-num" th:text="'Week ' + ${iter.count}">Week 1</span>
+                    <span><strong th:text="${w[0]}">Get set up</strong><span class="text-muted d-block small" th:text="${w[1]}">details</span></span>
+                </li>
+            </ol>
+        </div>
+    </section>
+</div>
+
+<script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<div th:replace="~{fragments/footer :: footer}"></div>
+</body>
+</html>

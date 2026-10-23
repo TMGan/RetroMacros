@@ -37,6 +37,7 @@ public class AdminController {
     private final FoodLogRepository foodLogRepository;
     private final AllowedEmailRepository allowedEmailRepository;
     private final AdminAuditLogRepository auditLogRepository;
+    private final com.mealplanner.service.ChallengeService challengeService;
 
     public AdminController(AdminService adminService,
                            UserRepository userRepository,
@@ -45,7 +46,9 @@ public class AdminController {
                            AllowedEmailRepository allowedEmailRepository,
                            AdminAuditLogRepository auditLogRepository,
                            com.mealplanner.service.ProgressService progressService,
-                           com.mealplanner.service.MeasurementService measurementService) {
+                           com.mealplanner.service.MeasurementService measurementService,
+                           com.mealplanner.service.ChallengeService challengeService) {
+        this.challengeService = challengeService;
         this.measurementService = measurementService;
         this.progressService = progressService;
         this.allowedEmailRepository = allowedEmailRepository;
@@ -138,7 +141,22 @@ public class AdminController {
         ProgressController.addMeasurementModel(model, client, measurementService);
         model.addAttribute("healthLabels", com.mealplanner.model.HealthCondition.parse(client.getHealthConditions()).stream()
                 .map(com.mealplanner.model.HealthCondition::getLabel).toList());
+        model.addAttribute("accessEnd", challengeService.accessEndFor(client));
         return "admin/user-details";
+    }
+
+    /** Gives one client a different last day of access (empty resets them to the challenge default). */
+    @PostMapping("/users/{userId}/access")
+    public String setAccessUntil(@AuthenticationPrincipal OAuth2User principal,
+                                 @PathVariable Long userId,
+                                 @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate accessUntil) {
+        requireAdmin(principal);
+        User client = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        client.setAccessUntil(accessUntil);
+        userRepository.save(client);
+        auditLogRepository.save(new AdminAuditLog(getCurrentUser(principal).getEmail(), "ACCESS_UNTIL",
+                "user:" + userId + " " + (accessUntil == null ? "default" : accessUntil)));
+        return "redirect:/admin/users/" + userId + "?accessSaved=true";
     }
 
     /** The coach confirms a doctor has cleared a flagged client, so plans use normal targets again (or undoes it). */
