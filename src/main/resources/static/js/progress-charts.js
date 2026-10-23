@@ -3,6 +3,9 @@
 (function () {
     const source = document.getElementById('progressData');
     if (!source || typeof Chart === 'undefined') return;
+    // Same font as the rest of the page, at a size that's easy to read.
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.font.size = 13;
     const data = JSON.parse(source.textContent || '{}');
     if (!data.dates || data.dates.length === 0) return;
 

@@ -12,7 +12,12 @@
   --warning: #ffd166;
   --danger: #ff5d6c;
   --glow: 0 0 8px rgba(45, 212, 255, 0.6), 0 0 20px rgba(167, 139, 250, 0.35);
+  /* One font for all text and numbers, charts included. The arcade font is only for the logo
+     and section titles. */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --bs-body-font-family: var(--font);
 }
+body { font-family: var(--font); }
 
 /* The html element gets its own color so the body paints its gradient over the full page height.
    Without it the gradient is sized to one screen and repeats, leaving a visible seam on long pages. */
@@ -414,13 +419,49 @@ a:hover { color: var(--neon-purple); text-shadow: 0 0 6px rgba(45,212,255,0.6); 
   letter-spacing: 0.08em;
   color: var(--muted);
 }
+/* Big numbers: the same font as the text, a normal weight and normal spacing, so they read like
+   the rest of the page instead of standing out as a different style. */
 .stat-tile .stat-value {
-  font-family: 'Orbitron', 'Audiowide', system-ui, sans-serif;
+  font-family: var(--font);
+  font-weight: 600;
   font-size: 1.8rem;
   color: var(--text);
-  line-height: 1.2;
+  line-height: 1.25;
   margin-top: 4px;
 }
+.stat-tile .stat-desc {
+  margin-top: 6px;
+  font-size: 0.82rem;
+  line-height: 1.4;
+  color: var(--muted);
+}
+.tile-action { font-size: 0.75rem; text-transform: none; letter-spacing: 0; color: var(--neon-blue); text-decoration: none; }
+.tile-action:hover { text-decoration: underline; }
+
+/* Label-and-value lists on the progress Overview */
+.fact-list { margin: 0; }
+.fact-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 8px 0;
+  border-top: 1px solid rgba(167, 139, 250, 0.12);
+}
+.fact-list > div:first-child { border-top: 0; padding-top: 0; }
+.fact-list dt { font-weight: 400; color: var(--muted); }
+.fact-list dd { margin: 0; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* Check-in: sliders that start unset */
+.checkin-flow { margin-bottom: 1rem; }
+.checkin-done-weight { font-size: 1.6rem; font-weight: 600; }
+.checkin-skip { color: var(--muted); text-decoration: none; }
+.checkin-skip:hover { color: var(--text); }
+.feel { padding: 8px 0 4px; }
+.feel-word { font-size: 1.25rem; font-weight: 600; margin-bottom: 14px; color: var(--muted); }
+.feel.is-set .feel-word { color: var(--neon-blue); }
+.feel-range { accent-color: var(--neon-blue); }
+.feel:not(.is-set) .feel-range { opacity: 0.55; }
+.feel-ends { display: flex; justify-content: space-between; margin-top: 4px; font-size: 0.82rem; color: var(--muted); }
 .stat-tile .stat-sub {
   font-size: 0.8rem;
   color: var(--muted);
@@ -439,7 +480,8 @@ a:hover { color: var(--neon-purple); text-shadow: 0 0 6px rgba(45,212,255,0.6); 
 }
 .target-tile .stat-value { font-size: 1.6rem; white-space: nowrap; }
 .target-tile .stat-value small {
-  font-family: system-ui, sans-serif;
+  font-family: var(--font);
+  font-weight: 400;
   font-size: 0.85rem;
   color: var(--muted);
   margin-left: 4px;
@@ -524,8 +566,8 @@ a:hover { color: var(--neon-purple); text-shadow: 0 0 6px rgba(45,212,255,0.6); 
 .today-nudge:hover { border-color: var(--neon-blue); color: var(--text); }
 .today-nudge .bi { color: var(--neon-blue); }
 .today-calories { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; margin-bottom: 10px; }
-.today-big { font-family: 'Orbitron', 'Audiowide', system-ui, sans-serif; font-size: 2.2rem; line-height: 1.1; }
-.today-big small { font-family: system-ui, sans-serif; font-size: 1rem; color: var(--muted); }
+.today-big { font-weight: 600; font-size: 2.2rem; line-height: 1.15; }
+.today-big small { font-weight: 400; font-size: 1rem; color: var(--muted); }
 .today-left { font-size: 1rem; color: var(--neon-blue); white-space: nowrap; }
 .today-bar { height: 10px; border-radius: 5px; background: rgba(255, 255, 255, 0.07); overflow: hidden; }
 .today-bar.thin { height: 6px; margin-top: 6px; }
@@ -632,6 +674,11 @@ a:hover { color: var(--neon-purple); text-shadow: 0 0 6px rgba(45,212,255,0.6); 
   border-bottom: 2px solid transparent;
 }
 .plan-tabs a:hover { color: var(--text); }
+@media (max-width: 575px) {
+  .plan-tabs a { padding: 10px 10px; font-size: 0.9rem; }
+  .plan-tabs a .bi { display: none; }
+  .wizard-nav .btn { min-width: 0; flex: 1 1 auto; }
+}
 .plan-tabs a.active { color: var(--neon-blue); border-bottom-color: var(--neon-blue); }
 .day-summary {
   display: flex;

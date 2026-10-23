@@ -3,38 +3,47 @@
 <head></head>
 <body>
 
-<!-- Headline numbers. Used on the client's progress page and the coach's client page. -->
+<!-- Headline numbers, each with a line saying what it means. Used on the client's progress
+     page and the coach's client page. Numbers only: no judgment on pace. -->
 <th:block th:fragment="stats(summary)">
-    <div class="row g-3 mb-4" th:if="${summary.hasData}">
-        <div class="col-6 col-lg-3">
-            <div class="card neon h-100"><div class="card-body stat-tile">
-                <div class="stat-label">Current (7-day avg)</div>
-                <div class="stat-value" th:text="${summary.currentWeight} + ' lb'">0 lb</div>
-                <div class="stat-sub" th:text="'Started at ' + ${summary.startWeight} + ' lb'">Started at</div>
-            </div></div>
+    <div class="row row-cols-1 row-cols-sm-2 row-cols-lg-4 g-3 mb-4" th:if="${summary.hasData}">
+        <div class="col">
+            <div class="target-tile stat-tile tile-protein">
+                <div class="stat-label">Current weight</div>
+                <div class="stat-value"><span th:text="${summary.currentWeight}">182.6</span><small>lb</small></div>
+                <div class="stat-desc">Your 7-day average, so daily water swings don't throw it off.</div>
+            </div>
         </div>
-        <div class="col-6 col-lg-3">
-            <div class="card neon h-100"><div class="card-body stat-tile">
+        <div class="col">
+            <div class="target-tile stat-tile tile-water">
                 <div class="stat-label">Total change</div>
-                <div class="stat-value" th:text="(${summary.change} > 0 ? '+' : '') + ${summary.change} + ' lb'">0 lb</div>
-                <div class="stat-sub" th:text="'Week ' + ${summary.weeksIn} + ' · ' + ${summary.entryCount} + ' weigh-ins'">Week 1</div>
-            </div></div>
+                <div class="stat-value"><span th:text="(${summary.change} > 0 ? '+' : '') + ${summary.change}">-4.9</span><small>lb</small></div>
+                <div class="stat-desc" th:text="'Since you started at ' + ${summary.startWeight} + ' lb, ' + ${summary.weeksIn} + (${summary.weeksIn == 1} ? ' week' : ' weeks') + ' ago.'">Since you started</div>
+            </div>
         </div>
-        <div class="col-6 col-lg-3">
-            <div class="card neon h-100"><div class="card-body stat-tile">
-                <!-- Deliberately just the number: no judgment on pace. Everyone's body responds differently. -->
+        <div class="col">
+            <div class="target-tile stat-tile tile-carbs">
                 <div class="stat-label">Weekly trend</div>
-                <div class="stat-value" th:text="${summary.weeklyRate != null} ? ((${summary.weeklyRate} > 0 ? '+' : '') + ${summary.weeklyRate} + ' lb') : '--'">--</div>
-                <div class="stat-sub" th:text="${summary.weeklyRate != null} ? 'per week, last 4 weeks' : 'Shows after 2 weeks of weigh-ins'">per week</div>
-            </div></div>
+                <div class="stat-value" th:if="${summary.weeklyRate != null}"><span th:text="(${summary.weeklyRate} > 0 ? '+' : '') + ${summary.weeklyRate}">-1.2</span><small>lb / week</small></div>
+                <div class="stat-value" th:if="${summary.weeklyRate == null}"><span>--</span></div>
+                <div class="stat-desc" th:text="${summary.weeklyRate != null} ? 'Average change per week over the last 4 weeks.' : 'Shows after 2 weeks of weigh-ins.'">Average change per week</div>
+            </div>
         </div>
-        <div class="col-6 col-lg-3">
-            <div class="card neon h-100"><div class="card-body stat-tile">
-                <div class="stat-label">Goal</div>
-                <div class="stat-value" th:text="${summary.goalWeight != null} ? ${summary.goalWeight} + ' lb' : 'Not set'">Not set</div>
-                <div class="stat-sub" th:if="${summary.toGoal != null}" th:text="${summary.toGoalAbs} + ' lb to go'">to go</div>
-                <div class="stat-sub" th:if="${summary.projectedDate != null}" th:text="'At this rate: ' + ${#temporals.format(summary.projectedDate, 'MMM d, yyyy')}">projected</div>
-            </div></div>
+        <div class="col">
+            <div class="target-tile stat-tile tile-fiber">
+                <div class="stat-label d-flex justify-content-between">
+                    <span>Goal</span>
+                    <a href="#goal-form" class="tile-action" data-bs-toggle="collapse" th:if="${goalEditable}"
+                       th:text="${summary.goalWeight != null} ? 'Change' : 'Set'">Change</a>
+                </div>
+                <div class="stat-value" th:if="${summary.goalWeight != null}"><span th:text="${summary.goalWeight % 1 == 0} ? ${#numbers.formatInteger(summary.goalWeight, 1)} : ${summary.goalWeight}">178</span><small>lb</small></div>
+                <div class="stat-value" th:if="${summary.goalWeight == null}"><span>--</span></div>
+                <div class="stat-desc" th:if="${summary.goalWeight == null}">Set one to see how far you have to go.</div>
+                <div class="stat-desc" th:if="${summary.toGoal != null}">
+                    <span th:text="${summary.toGoalAbs} + ' lb to go.'">4.6 lb to go.</span>
+                    <span th:if="${summary.projectedDate != null}" th:text="'Estimated ' + ${#temporals.format(summary.projectedDate, 'MMM d')} + ' at your current trend.'"></span>
+                </div>
+            </div>
         </div>
     </div>
 </th:block>
@@ -59,96 +68,67 @@
     </div>
 </th:block>
 
-<!-- Body composition, measurements, how they feel, nutrition consistency. -->
-<th:block th:fragment="details(summary)">
+<!-- The rest of the picture: habits, how they feel, body composition, measurements if any. -->
+<th:block th:fragment="details(summary, msummary)">
     <div class="row g-3 mb-4">
-        <div class="col-12 col-lg-6" th:if="${summary.composition != null && summary.composition.hasData}">
+        <div class="col-12 col-lg-6">
             <div class="card neon h-100"><div class="card-body">
-                <h5 class="mb-1">Lean vs fat mass</h5>
-                <p class="text-muted small mb-3">From your weight and body fat %. Lean mass holding steady while fat drops means the loss is coming from the right place.</p>
-                <table class="table table-dark mb-0">
-                    <thead><tr><th></th><th>Start</th><th>Now</th><th th:if="${summary.composition.hasChange}">Change</th></tr></thead>
-                    <tbody>
-                    <tr><th>Body fat</th><td th:text="${summary.composition.startBodyFat} + '%'">0</td><td th:text="${summary.composition.currentBodyFat} + '%'">0</td><td th:if="${summary.composition.hasChange}"></td></tr>
-                    <tr><th>Fat mass</th><td th:text="${summary.composition.startFat} + ' lb'">0</td><td th:text="${summary.composition.currentFat} + ' lb'">0</td>
-                        <td th:if="${summary.composition.hasChange}" th:text="(${summary.composition.fatChange} > 0 ? '+' : '') + ${summary.composition.fatChange} + ' lb'">0</td></tr>
-                    <tr><th>Lean mass</th><td th:text="${summary.composition.startLean} + ' lb'">0</td><td th:text="${summary.composition.currentLean} + ' lb'">0</td>
-                        <td th:if="${summary.composition.hasChange}" th:text="(${summary.composition.leanChange} > 0 ? '+' : '') + ${summary.composition.leanChange} + ' lb'">0</td></tr>
-                    </tbody>
-                </table>
+                <h5 class="mb-1">Your habits</h5>
+                <p class="text-muted small mb-3">From your food log over the last 7 days.</p>
+                <dl class="fact-list">
+                    <div><dt>Days logged</dt><dd th:text="${summary.nutrition.daysLogged} + ' of 7'">5 of 7</dd></div>
+                    <div th:if="${summary.nutrition.targetProtein != null}">
+                        <dt th:text="'Days you hit ' + ${summary.nutrition.targetProtein} + 'g protein'">Days you hit protein</dt>
+                        <dd th:text="${summary.nutrition.proteinHitDays} + ' of ' + ${summary.nutrition.daysLogged}">3 of 5</dd></div>
+                    <div th:if="${summary.nutrition.avgCalories != null}">
+                        <dt>Average calories on logged days</dt>
+                        <dd th:text="${summary.nutrition.avgCalories} + (${summary.nutrition.targetCalories != null} ? ' / ' + ${summary.nutrition.targetCalories} : '')">1900 / 2338</dd></div>
+                    <div th:if="${summary.nutrition.daysSinceStart != null}">
+                        <dt>Days logged since your first check-in</dt>
+                        <dd th:text="${summary.nutrition.daysLoggedSinceStart} + ' of ' + ${summary.nutrition.daysSinceStart}">20 of 35</dd></div>
+                </dl>
             </div></div>
         </div>
 
         <div class="col-12 col-lg-6" th:if="${summary.feelings != null && !#lists.isEmpty(summary.feelings)}">
             <div class="card neon h-100"><div class="card-body">
                 <h5 class="mb-1">How you've been feeling</h5>
-                <p class="text-muted small mb-3">Average score out of 5, first week vs the last 7 days.</p>
-                <table class="table table-dark mb-0">
-                    <thead><tr><th></th><th>First week</th><th>Last 7 days</th></tr></thead>
-                    <tbody>
-                    <tr th:each="f : ${summary.feelings}">
-                        <th th:text="${f.name}">Energy</th>
-                        <td th:text="${f.start != null} ? ${f.start} : '--'">0</td>
-                        <td>
-                            <span th:text="${f.current != null} ? ${f.current} : '--'">0</span>
-                            <i th:if="${f.start != null && f.current != null && f.current != f.start}"
-                               th:class="${(f.current > f.start) == f.higherIsBetter} ? 'bi bi-arrow-up-right text-success ms-1' : 'bi bi-arrow-down-right text-warning ms-1'"></i>
-                        </td>
-                    </tr>
-                    </tbody>
-                </table>
+                <p class="text-muted small mb-3">Your average out of 5, your first week next to the last 7 days.</p>
+                <dl class="fact-list">
+                    <div th:each="f : ${summary.feelings}">
+                        <dt th:text="${f.name}">Energy</dt>
+                        <dd>
+                            <span th:text="${f.start != null} ? ${f.start} : '--'">3.0</span>
+                            <i class="bi bi-arrow-right mx-1 text-muted" aria-label="to"></i>
+                            <span th:text="${f.current != null} ? ${f.current} : '--'">4.0</span>
+                        </dd>
+                    </div>
+                </dl>
             </div></div>
         </div>
 
-        <div class="col-12 col-lg-6">
+        <div class="col-12 col-lg-6" th:if="${summary.composition != null && summary.composition.hasData}">
             <div class="card neon h-100"><div class="card-body">
-                <h5 class="mb-1">Nutrition consistency</h5>
-                <p class="text-muted small mb-3">From the food log, last 7 days.</p>
-                <ul class="list-unstyled mb-0">
-                    <li class="mb-2"><strong th:text="${summary.nutrition.daysLogged} + ' of 7'">0 of 7</strong> days logged</li>
-                    <li class="mb-2" th:if="${summary.nutrition.avgCalories != null}">
-                        Averaging <strong th:text="${summary.nutrition.avgCalories}">0</strong> calories
-                        <span th:if="${summary.nutrition.targetCalories != null}" th:text="'(target ' + ${summary.nutrition.targetCalories} + ')'"></span>
-                        on logged days
-                    </li>
-                    <li class="mb-2" th:if="${summary.nutrition.targetProtein != null}">
-                        Hit protein (<span th:text="${summary.nutrition.targetProtein} + 'g'">0g</span>) on
-                        <strong th:text="${summary.nutrition.proteinHitDays}">0</strong> of those days
-                    </li>
-                    <li th:if="${summary.nutrition.daysSinceStart != null}">
-                        Since your first check-in: logged <strong th:text="${summary.nutrition.daysLoggedSinceStart} + ' of ' + ${summary.nutrition.daysSinceStart}">0</strong> days
-                    </li>
-                </ul>
+                <h5 class="mb-1">Lean vs fat mass</h5>
+                <p class="text-muted small mb-3">Worked out from your weight and body fat %.</p>
+                <dl class="fact-list">
+                    <div><dt>Body fat</dt><dd th:text="${summary.composition.startBodyFat} + '% → ' + ${summary.composition.currentBodyFat} + '%'">22% → 20%</dd></div>
+                    <div><dt>Fat mass</dt><dd th:text="${summary.composition.startFat} + ' → ' + ${summary.composition.currentFat} + ' lb'">41 → 37 lb</dd></div>
+                    <div><dt>Lean mass</dt><dd th:text="${summary.composition.startLean} + ' → ' + ${summary.composition.currentLean} + ' lb'">146 → 146 lb</dd></div>
+                </dl>
             </div></div>
         </div>
-    </div>
-</th:block>
 
-<!-- Week 1 vs now, for the end of the challenge. -->
-<th:block th:fragment="recap(summary, msummary)">
-    <div class="card neon mb-4" th:if="${summary.showRecap}">
-        <div class="card-body">
-            <h5 class="mb-1">Challenge recap</h5>
-            <p class="text-muted small mb-3" th:text="${#temporals.format(summary.firstDate, 'MMM d')} + ' to ' + ${#temporals.format(summary.latestDate, 'MMM d, yyyy')} + ' · week ' + ${summary.weeksIn}">dates</p>
-            <div class="row g-3 text-center">
-                <div class="col-6 col-md-3">
-                    <div class="stat-tile"><div class="stat-label">Weight</div>
-                        <div class="stat-value" th:text="(${summary.change} > 0 ? '+' : '') + ${summary.change}">0</div>
-                        <div class="stat-sub" th:text="${summary.startWeight} + ' to ' + ${summary.currentWeight} + ' lb'"></div></div>
-                </div>
-                <div class="col-6 col-md-3" th:if="${summary.composition.hasData && summary.composition.hasChange}">
-                    <div class="stat-tile"><div class="stat-label">Body fat</div>
-                        <div class="stat-value" th:text="${summary.composition.startBodyFat} + ' to ' + ${summary.composition.currentBodyFat} + '%'">0</div></div>
-                </div>
-                <div class="col-6 col-md-3" th:if="${summary.composition.hasData && summary.composition.hasChange}">
-                    <div class="stat-tile"><div class="stat-label">Fat mass</div>
-                        <div class="stat-value" th:text="(${summary.composition.fatChange} > 0 ? '+' : '') + ${summary.composition.fatChange} + ' lb'">0</div></div>
-                </div>
-                <div class="col-6 col-md-3" th:if="${msummary.totalAbs != null}">
-                    <div class="stat-tile"><div class="stat-label" th:text="${msummary.totalLost >= 0} ? 'Inches lost' : 'Inches gained'">Inches lost</div>
-                        <div class="stat-value" th:text="${msummary.totalAbs} + ' in'">0</div></div>
-                </div>
-            </div>
+        <!-- Only for clients who measure; nobody has to. -->
+        <div class="col-12 col-lg-6" th:if="${msummary != null and msummary.totalAbs != null}">
+            <div class="card neon h-100"><div class="card-body">
+                <h5 class="mb-1">Measurements</h5>
+                <p class="text-muted small mb-3" th:text="'Since ' + ${#temporals.format(msummary.firstDate, 'MMM d')} + ', across every spot you measured.'">Since</p>
+                <dl class="fact-list">
+                    <div><dt>Total</dt><dd th:text="(${msummary.totalChange} > 0 ? '+' : '') + ${msummary.totalChange} + ' in'">-4.5 in</dd></div>
+                    <div th:if="${msummary.waistChange != null}"><dt>Waist</dt><dd th:text="(${msummary.waistChange} > 0 ? '+' : '') + ${msummary.waistChange} + ' in'">-2 in</dd></div>
+                </dl>
+            </div></div>
         </div>
     </div>
 </th:block>

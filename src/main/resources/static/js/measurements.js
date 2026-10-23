@@ -14,6 +14,8 @@
     const canvas = document.getElementById('measurementChart');
     const picker = document.getElementById('measurementPicker');
     if (!source || !canvas || !picker || typeof Chart === 'undefined') return;
+    Chart.defaults.font.family = getComputedStyle(document.body).fontFamily;
+    Chart.defaults.font.size = 13;
     const data = JSON.parse(source.textContent || '{}');
     const keys = Object.keys(data.series || {});
     if (keys.length === 0) return;

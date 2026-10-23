@@ -34,14 +34,12 @@ public class ProgressController {
     static final int MAX_BACKDATE_DAYS = 14;
     // Measurements are monthly, so allow catching up on a session from the last month.
     static final int MAX_MEASUREMENT_BACKDATE_DAYS = 30;
-    // The page's sections, picked from the menu: anchor id, label, icon.
+    // The page's tabs, most used first: anchor id, label, icon. Goal weight lives in Overview.
     static final java.util.List<String[]> SECTIONS = java.util.List.of(
             new String[]{"checkin", "Check in", "bi-check2-circle"},
             new String[]{"overview", "Overview", "bi-speedometer2"},
             new String[]{"charts", "Charts", "bi-graph-up"},
-            new String[]{"details", "Details", "bi-list-check"},
-            new String[]{"measurements", "Measurements", "bi-rulers"},
-            new String[]{"goal", "Goal", "bi-flag"});
+            new String[]{"measurements", "Measurements", "bi-rulers"});
 
     private final ProgressService progressService;
     private final MeasurementService measurementService;
@@ -73,6 +71,8 @@ public class ProgressController {
         model.addAttribute("measurementEarliest", today.minusDays(MAX_MEASUREMENT_BACKDATE_DAYS));
         model.addAttribute("impersonating", currentUserService.isViewingAs(session));
         model.addAttribute("progressSections", SECTIONS);
+        // The coach viewing a client is read-only, so no goal editing there.
+        model.addAttribute("goalEditable", !currentUserService.isViewingAs(session));
         return "progress";
     }
 
@@ -178,12 +178,12 @@ public class ProgressController {
         User user = currentUserService.require(principal);
         if (goalWeight != null && !inRange(goalWeight, 70, 700)) {
             redirectAttributes.addFlashAttribute("error", "Goal weight must be between 70 and 700 lb.");
-            return "redirect:/progress#goal";
+            return "redirect:/progress#overview";
         }
         user.setGoalWeightLbs(round1(goalWeight));
         userRepository.save(user);
         redirectAttributes.addFlashAttribute("success", goalWeight == null ? "Goal weight cleared." : "Goal weight saved.");
-        return "redirect:/progress#goal";
+        return "redirect:/progress#overview";
     }
 
     /** Everything the measurement section needs. Shared with the coach's client page. */

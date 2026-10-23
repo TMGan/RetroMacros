@@ -142,8 +142,8 @@
             card.dataset.pro = meal.macros.protein;
             card.dataset.carbs = meal.macros.carbs;
             card.dataset.fat = meal.macros.fat;
-            card.querySelector('.meal-macros').textContent = meal.macros.calories + ' cal · ' + meal.macros.protein + 'P · '
-                + meal.macros.carbs + 'C · ' + meal.macros.fat + 'F';
+            card.querySelector('.meal-macros').textContent = meal.macros.calories + ' cal · ' + meal.macros.protein + 'g protein · '
+                + meal.macros.carbs + 'g carbs · ' + meal.macros.fat + 'g fat';
         }
         const rb = card.querySelector('[data-action="recipe"]');
         if (rb && meal.recipe) {
@@ -205,7 +205,7 @@
                 return;
             }
             options.forEach(o => swapList.appendChild(option(o.name,
-                o.calories + ' cal · ' + o.protein + 'P · ' + o.carbs + 'C · ' + o.fat + 'F',
+                o.calories + ' cal · ' + o.protein + 'g protein · ' + o.carbs + 'g carbs · ' + o.fat + 'g fat',
                 () => recordSwap(card, item, o.name))));
         }).catch(() => { swapList.innerHTML = '<div class="text-muted small">Could not load swaps.</div>'; });
     }
