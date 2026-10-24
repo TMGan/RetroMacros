@@ -138,15 +138,20 @@ public class MacroCalculatorService {
 
         NutritionTargets t = new NutritionTargets();
         double calories = tdee;
+        // The weekly weigh-in change. A health hold stays at plain maintenance.
+        int adjustment = healthHold ? 0 : p.getCalorieAdjustment();
         if (!healthHold && goal.equals("lose")) {
             double deficit = week == null ? FAT_LOSS_DEFICIT : FAT_LOSS_DEFICIT * week / RAMP_WEEKS;
-            double planned = tdee * (1 - deficit);
+            double planned = tdee * (1 - deficit) + adjustment;
             double floor = Math.max(bmr, female ? MIN_CALORIES_FEMALE : MIN_CALORIES_MALE);
             // Never below resting burn or the minimums, and never above maintenance.
             calories = Math.min(tdee, Math.max(planned, floor));
             t.setFloorApplied(calories > planned + 0.5);
         } else if (!healthHold && goal.equals("build")) {
-            calories = tdee * (1 + BUILD_SURPLUS);
+            // Only a raise carries over: a cut from a past fat-loss goal doesn't apply here.
+            calories = tdee * (1 + BUILD_SURPLUS) + Math.max(0, adjustment);
+        } else if (!healthHold) {
+            calories = tdee + Math.max(0, adjustment);
         }
 
         double ref = referenceWeight(p);

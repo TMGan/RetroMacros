@@ -129,6 +129,17 @@
                     <button type="submit" class="btn btn-outline-neon">Save</button>
                 </form>
                 <small class="text-muted d-block mt-2" th:text="'Currently: ' + ${#temporals.format(accessEnd, 'MMM d, yyyy')}">Currently</small>
+                <h5 class="mb-1 mt-4">Weekly calorie adjustment</h5>
+                <p class="text-muted small mb-2">Set from weigh-ins with the first plan each week: 100 less after a 2-week stall on fat loss, 100 more when losing over 1% a week. The safety minimum still applies.</p>
+                <div th:if="${param.adjustmentReset}" class="alert alert-success py-2">Reset. Their next new-week plan uses the normal target.</div>
+                <p class="mb-2" th:if="${user.calorieAdjustment == 0}">None</p>
+                <div th:if="${user.calorieAdjustment != 0}" class="d-flex align-items-center gap-2">
+                    <span th:text="${(user.calorieAdjustment > 0 ? '+' : '') + user.calorieAdjustment + ' cal a day'
+                            + (user.calorieAdjustedOn != null ? ', changed ' + #temporals.format(user.calorieAdjustedOn, 'MMM d') : '')}">-100 cal a day</span>
+                    <form th:action="@{/admin/users/{id}/calorie-adjustment/reset(id=${user.id})}" method="post">
+                        <button type="submit" class="btn btn-sm btn-outline-neon">Reset</button>
+                    </form>
+                </div>
             </div></div>
         </div>
     </div>

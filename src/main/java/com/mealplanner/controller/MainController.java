@@ -32,6 +32,7 @@ public class MainController {
     private final CurrentUserService currentUserService;
     private final AiQuotaService aiQuotaService;
     private final FoodLogService foodLogService;
+    private final WeeklyAdjustmentService weeklyAdjustmentService;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MainController.class);
     private static final int MAX_OTHER_ALLERGIES_LENGTH = 200;
@@ -47,7 +48,8 @@ public class MainController {
                           SwapService swapService,
                           CurrentUserService currentUserService,
                           AiQuotaService aiQuotaService,
-                          FoodLogService foodLogService) {
+                          FoodLogService foodLogService,
+                          WeeklyAdjustmentService weeklyAdjustmentService) {
         this.macroService = macroService;
         this.mealPlanService = mealPlanService;
         this.userRepository = userRepository;
@@ -58,6 +60,7 @@ public class MainController {
         this.currentUserService = currentUserService;
         this.aiQuotaService = aiQuotaService;
         this.foodLogService = foodLogService;
+        this.weeklyAdjustmentService = weeklyAdjustmentService;
     }
 
     @GetMapping("/")
@@ -192,6 +195,12 @@ public class MainController {
         } else {
             user.setRampStartDate(null);
         }
+        // Targets change once a week: a second plan in the same week keeps the first one's numbers,
+        // and the weigh-in adjustment only runs with the first plan of a new week.
+        SavedMealPlan weekPlan = firstPlanThisWeek(user, today, fitnessGoal, macroStyle, healthKeys);
+        int weeklyChange = weekPlan == null
+                ? weeklyAdjustmentService.update(user, fitnessGoal, today, rampWeek != null, health)
+                : 0;
         userRepository.save(user);
 
         UserProfile profile = new UserProfile(weight, heightFeet, heightInches, age,
@@ -207,6 +216,7 @@ public class MainController {
         profile.setHealthConditions(health);
         profile.setHealthNotes(user.getHealthNotes());
         profile.setHealthCleared(user.isHealthCleared());
+        profile.setCalorieAdjustment(user.getCalorieAdjustment());
 
         NutritionTargets nutrition;
         try {
@@ -214,6 +224,7 @@ public class MainController {
         } catch (IllegalArgumentException iae) {
             return formWithErrors(model, user, submitted, List.of(iae.getMessage()));
         }
+        if (weekPlan != null) keepWeekTargets(nutrition, weekPlan);
         MacroTargets targets = nutrition.toMacroTargets();
 
         // A plan that fails to build hands its uses back, so a hiccup never costs one of the client's weekly plans.
@@ -279,6 +290,7 @@ public class MainController {
             model.addAttribute("nutrition", nutrition);
             model.addAttribute("mealPlan", mealPlan);
             model.addAttribute("groceryList", groceryList);
+            model.addAttribute("weeklyChange", weeklyChange);
             return "results"; // templates/results.html
         } catch (AiQuotaService.QuotaExceededException ex) {
             refundUses(user, saveCounted, planCounted);
@@ -294,6 +306,35 @@ public class MainController {
             log.warn("Meal plan generation failed for user {}", user.getId(), ex);
             return formWithErrors(model, user, submitted, List.of("We couldn't generate your meal plan right now. Please try again in a minute."));
         }
+    }
+
+    /**
+     * The client's first plan this week (Monday to Sunday) with the same goal, macro style and
+     * health answers, or null. Changing any of those gets fresh targets mid-week.
+     */
+    private SavedMealPlan firstPlanThisWeek(User user, LocalDate today, String goal, String macroStyle, String healthKeys) {
+        if (UserProfile.STYLE_CUSTOM.equals(macroStyle)) return null;
+        LocalDate weekStart = ChallengeService.weekStart(today);
+        SavedMealPlan first = null;
+        for (SavedMealPlan p : savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user)) {
+            if (p.getCreatedAt() == null || p.getCreatedAt().toLocalDate().isBefore(weekStart)) break;
+            if (!p.isGenerationFailed()
+                    && Objects.equals(p.getFitnessGoal(), goal)
+                    && Objects.equals(p.getMacroStyle(), macroStyle)
+                    && Objects.toString(p.getHealthConditions(), "").equals(healthKeys)) {
+                first = p;
+            }
+        }
+        return first;
+    }
+
+    private static void keepWeekTargets(NutritionTargets nutrition, SavedMealPlan weekPlan) {
+        nutrition.setCalories(weekPlan.getTargetCalories());
+        nutrition.setProtein(weekPlan.getTargetProtein());
+        nutrition.setCarbs(weekPlan.getTargetCarbs());
+        nutrition.setFat(weekPlan.getTargetFat());
+        if (weekPlan.getFiberTarget() != null) nutrition.setFiber(weekPlan.getFiberTarget());
+        nutrition.setRampWeek(weekPlan.getRampWeek());
     }
 
     private void refundUses(User user, boolean saveCounted, boolean planCounted) {

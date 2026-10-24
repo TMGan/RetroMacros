@@ -100,4 +100,9 @@ public class UserProfile {
     public void setHealthNotes(String healthNotes) { this.healthNotes = healthNotes; }
     public boolean isHealthCleared() { return healthCleared; }
     public void setHealthCleared(boolean healthCleared) { this.healthCleared = healthCleared; }
+
+    // Weekly change from weigh-ins (see WeeklyAdjustmentService), in calories a day.
+    private int calorieAdjustment;
+    public int getCalorieAdjustment() { return calorieAdjustment; }
+    public void setCalorieAdjustment(int calorieAdjustment) { this.calorieAdjustment = calorieAdjustment; }
 }

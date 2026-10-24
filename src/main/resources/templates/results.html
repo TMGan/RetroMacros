@@ -85,6 +85,13 @@
                 <i class="bi bi-shield-check"></i>
                 Calories are set to a safe minimum, so you never eat less than your body needs at rest.
             </p>
+            <p class="target-note" th:if="${weeklyChange != null and weeklyChange != 0}">
+                <i class="bi bi-arrow-repeat"></i>
+                <span th:text="${weeklyChange > 0}
+                        ? ('From your weigh-ins, your calories went up ' + ${weeklyChange} + ' a day for this week.')
+                        : ('From your weigh-ins, your calories went down ' + ${-weeklyChange} + ' a day for this week.')">Update</span>
+                Your targets stay the same until next week.
+            </p>
         </div>
     </div>
 
