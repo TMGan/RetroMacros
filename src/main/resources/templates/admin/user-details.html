@@ -61,15 +61,18 @@
         <div class="card-body">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                 <h5 class="mb-0">Health check</h5>
-                <span th:if="${!#lists.isEmpty(healthLabels) and !user.healthCleared}" class="badge text-bg-danger">Needs review: plans are at maintenance calories</span>
-                <span th:if="${!#lists.isEmpty(healthLabels) and user.healthCleared}" class="badge text-bg-success">Cleared: normal targets</span>
+                <span>
+                    <span th:if="${user.onGlp1}" class="badge text-bg-info">GLP-1: small protein-first meals, no stall cuts</span>
+                    <span th:if="${user.hasReviewFlags() and !user.healthCleared}" class="badge text-bg-danger">Needs review: plans are at maintenance calories</span>
+                    <span th:if="${user.hasReviewFlags() and user.healthCleared}" class="badge text-bg-success">Cleared: normal targets</span>
+                </span>
             </div>
             <div th:if="${param.healthSaved}" class="alert alert-success py-2">Saved. The client's next plan uses the new setting.</div>
             <ul class="mb-2" th:if="${!#lists.isEmpty(healthLabels)}">
                 <li th:each="h : ${healthLabels}" th:text="${h}">condition</li>
             </ul>
             <p class="mb-2" th:if="${user.healthNotes != null}"><strong>Client's notes:</strong> <span th:text="${user.healthNotes}">notes</span></p>
-            <form th:if="${!#lists.isEmpty(healthLabels)}" th:action="@{/admin/users/{id}/health-clearance(id=${user.id})}" method="post" class="d-flex flex-wrap align-items-center gap-2">
+            <form th:if="${user.hasReviewFlags()}" th:action="@{/admin/users/{id}/health-clearance(id=${user.id})}" method="post" class="d-flex flex-wrap align-items-center gap-2">
                 <input type="hidden" name="cleared" th:value="${!user.healthCleared}">
                 <button type="submit" class="btn btn-outline-neon btn-sm"
                         th:text="${user.healthCleared} ? 'Put back on maintenance' : 'Doctor has cleared them: use normal targets'">Clear</button>

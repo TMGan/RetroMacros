@@ -132,7 +132,7 @@ public class MacroCalculatorService {
         double tdee = calculateTDEE(bmr, p.getActivityLevel());
         boolean female = "female".equalsIgnoreCase(p.getSex());
         Set<HealthCondition> health = p.getHealthConditions();
-        boolean healthHold = !health.isEmpty() && !p.isHealthCleared();
+        boolean healthHold = HealthCondition.needsReview(health) && !p.isHealthCleared();
         String goal = goalKey(p.getFitnessGoal());
         Integer week = (rampWeek == null || rampWeek < 1) ? null : Math.min(rampWeek, RAMP_WEEKS);
 

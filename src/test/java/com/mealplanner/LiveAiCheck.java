@@ -87,6 +87,13 @@ class LiveAiCheck {
                 preferencesService.buildPreferencesPrompt(user), user);
     }
 
+    @Test
+    void glp1FatLoss() {
+        UserProfile p = new UserProfile(210, 5, 4, 58, "Female", "Lightly Active", "Lose Weight", List.of());
+        p.setHealthConditions(EnumSet.of(HealthCondition.GLP1));
+        run("6. GLP-1 medication, fat loss", p, null, null);
+    }
+
     private void run(String title, UserProfile profile, Integer rampWeek, String prefs) {
         run(title, profile, rampWeek, prefs, newUser());
     }

@@ -186,6 +186,27 @@ class PlanEngineFeatureTest {
     }
 
     @Test
+    void glp1IsOnTheFormSkipsTheHoldAndShowsTheCoachABadge() throws Exception {
+        mvc.perform(get("/form").with(signedInAs(invitedClient())))
+                .andExpect(content().string(containsString("Taking a GLP-1 medication")));
+
+        User client = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true").param("healthConditions", "glp1").with(signedInAs(client)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("set to maintenance calories"))));
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0).getHealthHold()).isFalse();
+
+        User coach = userRepository.findByEmail("coach@example.com").orElseGet(() -> userRepository.save(new User("coach@example.com", "Coach", "gid-coach-" + UUID.randomUUID())));
+        coach.setAdmin(true);
+        userRepository.save(coach);
+        mvc.perform(get("/admin/users/" + client.getId()).with(signedInAs(coach)))
+                .andExpect(content().string(containsString("GLP-1: small protein-first meals")))
+                .andExpect(content().string(not(containsString("Needs review"))));
+        mvc.perform(get("/admin/users").with(signedInAs(coach)))
+                .andExpect(content().string(containsString(">GLP-1</span>")));
+    }
+
+    @Test
     void healthFlagHoldsAtMaintenanceAndShowsForTheCoach() throws Exception {
         User client = invitedClient();
         mvc.perform(plan().param("acceptDisclaimer", "true").param("healthConditions", "kidney")

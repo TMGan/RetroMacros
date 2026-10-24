@@ -73,6 +73,26 @@ class WeeklyAdjustmentServiceTest {
     }
 
     @Test
+    void glp1KeepsNormalTargetsButNeverGetsAStallCut() {
+        MacroCalculatorService calc = new MacroCalculatorService();
+        UserProfile p = new UserProfile(200, 5, 10, 40, "male", "Moderately Active", "Lose Weight", List.of());
+        int normal = calc.buildTargets(p, null).getCalories();
+        p.setHealthConditions(java.util.EnumSet.of(com.mealplanner.model.HealthCondition.GLP1));
+        NutritionTargets glp1 = calc.buildTargets(p, null);
+        assertThat(glp1.isHealthHold()).isFalse();
+        assertThat(glp1.getCalories()).isEqualTo(normal);
+
+        com.mealplanner.repository.BodyCheckInRepository repo = org.mockito.Mockito.mock(com.mealplanner.repository.BodyCheckInRepository.class);
+        org.mockito.Mockito.when(repo.findByUserOrderByCheckInDateAsc(org.mockito.ArgumentMatchers.any())).thenReturn(weighIns(14, 200, 0, 200));
+        com.mealplanner.model.User user = new com.mealplanner.model.User("g@example.com", "G", "g");
+        int change = new WeeklyAdjustmentService(repo).update(user, "Lose Weight", TODAY, false,
+                java.util.EnumSet.of(com.mealplanner.model.HealthCondition.GLP1));
+        assertThat(change).isZero();
+        assertThat(new WeeklyAdjustmentService(repo).update(new com.mealplanner.model.User("n@example.com", "N", "n"), "Lose Weight", TODAY, false,
+                java.util.EnumSet.noneOf(com.mealplanner.model.HealthCondition.class))).isEqualTo(-100);
+    }
+
+    @Test
     void adjustmentMovesTheTargetButNeverBelowTheFloor() {
         MacroCalculatorService calc = new MacroCalculatorService();
         UserProfile p = new UserProfile(200, 5, 10, 40, "male", "Moderately Active", "Lose Weight", List.of());
