@@ -66,6 +66,25 @@ public class User {
     @Column(name = "access_until")
     private java.time.LocalDate accessUntil;
 
+    // Weekly calorie change from weigh-ins, added to the goal calories. Null means none.
+    @Column(name = "calorie_adjustment")
+    private Integer calorieAdjustment;
+
+    // Monday of the last week the weigh-ins were checked, so it runs once a week.
+    @Column(name = "adjustment_checked_week")
+    private java.time.LocalDate adjustmentCheckedWeek;
+
+    // Day the adjustment last changed.
+    @Column(name = "calorie_adjusted_on")
+    private java.time.LocalDate calorieAdjustedOn;
+
+    public int getCalorieAdjustment() { return calorieAdjustment == null ? 0 : calorieAdjustment; }
+    public void setCalorieAdjustment(Integer calorieAdjustment) { this.calorieAdjustment = calorieAdjustment; }
+    public java.time.LocalDate getAdjustmentCheckedWeek() { return adjustmentCheckedWeek; }
+    public void setAdjustmentCheckedWeek(java.time.LocalDate adjustmentCheckedWeek) { this.adjustmentCheckedWeek = adjustmentCheckedWeek; }
+    public java.time.LocalDate getCalorieAdjustedOn() { return calorieAdjustedOn; }
+    public void setCalorieAdjustedOn(java.time.LocalDate calorieAdjustedOn) { this.calorieAdjustedOn = calorieAdjustedOn; }
+
     public java.time.LocalDate getAccessUntil() { return accessUntil; }
     public void setAccessUntil(java.time.LocalDate accessUntil) { this.accessUntil = accessUntil; }
 

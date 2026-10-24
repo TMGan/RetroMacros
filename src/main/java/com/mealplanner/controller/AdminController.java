@@ -159,6 +159,18 @@ public class AdminController {
         return "redirect:/admin/users/" + userId + "?accessSaved=true";
     }
 
+    /** The coach undoes the weekly weigh-in changes. It applies from the client's next new-week plan. */
+    @PostMapping("/users/{userId}/calorie-adjustment/reset")
+    public String resetCalorieAdjustment(@AuthenticationPrincipal OAuth2User principal, @PathVariable Long userId) {
+        requireAdmin(principal);
+        User client = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        client.setCalorieAdjustment(null);
+        client.setCalorieAdjustedOn(null);
+        userRepository.save(client);
+        auditLogRepository.save(new AdminAuditLog(getCurrentUser(principal).getEmail(), "CALORIE_ADJUSTMENT_RESET", "user:" + userId));
+        return "redirect:/admin/users/" + userId + "?adjustmentReset=true";
+    }
+
     /** The coach confirms a doctor has cleared a flagged client, so plans use normal targets again (or undoes it). */
     @PostMapping("/users/{userId}/health-clearance")
     public String setHealthClearance(@AuthenticationPrincipal OAuth2User principal,

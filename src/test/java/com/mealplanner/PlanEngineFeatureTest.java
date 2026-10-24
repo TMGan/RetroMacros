@@ -14,6 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -42,6 +43,7 @@ class PlanEngineFeatureTest {
     @Autowired private SavedMealPlanRepository savedMealPlanRepository;
     @Autowired private com.mealplanner.service.UserFoodPreferencesService preferencesService;
     @Autowired private com.mealplanner.service.AiQuotaService aiQuotaService;
+    @Autowired private com.mealplanner.repository.BodyCheckInRepository checkInRepository;
 
     private User invitedClient() {
         String email = UUID.randomUUID() + "@example.com";
@@ -114,6 +116,55 @@ class PlanEngineFeatureTest {
     }
 
     @Test
+    void secondPlanOfTheWeekKeepsTheFirstPlansTargets() throws Exception {
+        User client = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
+        mvc.perform(plan().param("weight", "185").with(signedInAs(client))).andExpect(status().isOk());
+
+        List<SavedMealPlan> plans = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client);
+        assertThat(plans).hasSize(2);
+        assertThat(plans.get(0).getTargetCalories()).isEqualTo(plans.get(1).getTargetCalories());
+        assertThat(plans.get(0).getTargetProtein()).isEqualTo(plans.get(1).getTargetProtein());
+
+        // A new goal mid-week gets fresh numbers.
+        User switcher = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(switcher))).andExpect(status().isOk());
+        mvc.perform(plan().with(r -> { r.setParameter("fitnessGoal", "Maintain Weight"); return r; }).with(signedInAs(switcher)))
+                .andExpect(status().isOk());
+        List<SavedMealPlan> switched = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(switcher);
+        assertThat(switched.get(0).getTargetCalories()).isGreaterThan(switched.get(1).getTargetCalories());
+    }
+
+    @Test
+    void aTwoWeekStallTakesOff100AndTheCoachCanResetIt() throws Exception {
+        User steady = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(steady))).andExpect(status().isOk());
+        int normal = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(steady).get(0).getTargetCalories();
+
+        User stalled = invitedClient();
+        for (int daysAgo : new int[] {14, 7, 0}) {
+            com.mealplanner.model.BodyCheckIn c = new com.mealplanner.model.BodyCheckIn();
+            c.setUser(stalled);
+            c.setCheckInDate(java.time.LocalDate.now().minusDays(daysAgo));
+            c.setWeightLbs(200.0);
+            checkInRepository.save(c);
+        }
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(stalled)))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("your calories went down 100 a day for this week")));
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(stalled).get(0).getTargetCalories()).isEqualTo(normal - 100);
+        assertThat(userRepository.findById(stalled.getId()).orElseThrow().getCalorieAdjustment()).isEqualTo(-100);
+
+        User coach = userRepository.findByEmail("coach@example.com").orElseGet(() -> userRepository.save(new User("coach@example.com", "Coach", "gid-coach-" + UUID.randomUUID())));
+        coach.setAdmin(true);
+        userRepository.save(coach);
+        mvc.perform(get("/admin/users/" + stalled.getId()).with(signedInAs(coach)))
+                .andExpect(content().string(containsString("-100 cal a day")));
+        mvc.perform(post("/admin/users/" + stalled.getId() + "/calorie-adjustment/reset").with(signedInAs(coach)).with(csrf()));
+        assertThat(userRepository.findById(stalled.getId()).orElseThrow().getCalorieAdjustment()).isZero();
+    }
+
+    @Test
     void simpleRampedPlanShowsTheWeekAndCreatine() throws Exception {
         User client = invitedClient();
         mvc.perform(plan().param("acceptDisclaimer", "true").param("effortLevel", "simple").param("ramp", "true")
@@ -147,7 +198,7 @@ class PlanEngineFeatureTest {
         assertThat(saved.getHealthHold()).isTrue();
         assertThat(saved.getHealthConditions()).isEqualTo("kidney");
 
-        User coach = userRepository.save(new User("coach@example.com", "Coach", "gid-coach-" + UUID.randomUUID()));
+        User coach = userRepository.findByEmail("coach@example.com").orElseGet(() -> userRepository.save(new User("coach@example.com", "Coach", "gid-coach-" + UUID.randomUUID())));
         coach.setAdmin(true);
         userRepository.save(coach);
         mvc.perform(get("/admin/users/" + client.getId()).with(signedInAs(coach)))
