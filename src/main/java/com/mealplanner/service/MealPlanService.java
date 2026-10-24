@@ -232,11 +232,19 @@ public class MealPlanService {
             p.append(clientPreferences.trim()).append("\n\n");
         }
 
+        p.append("MAKE IT THEIRS, AND MAKE IT DOABLE:\n")
+         .append("- This plan is for one specific person. Their goal, the foods they picked, their cooking effort and their health ")
+         .append("answers should be obvious in it. Two clients with different picks should get clearly different plans.\n")
+         .append("- Use everyday grocery-store foods in familiar combinations real people cook, for example ground beef and rice, ")
+         .append("chicken and potatoes, eggs and toast, Greek yogurt and berries. Simple is good.\n")
+         .append("- Pick the common, affordable version of a food (ground beef, not bison; regular rice, not specialty grains) ")
+         .append("unless the client picked something else.\n\n");
+
         p.append("NUTRITION QUALITY:\n")
          .append("- Mostly whole, minimally processed foods: lean proteins, vegetables, fruit, whole grains, beans and lentils, nuts, seeds and olive oil.\n")
          .append("- Color variety: at least 3 different colors of vegetables and fruit each day, for a wide range of vitamins and minerals.\n")
          .append("- 1 to 2 servings of fruit a day.\n")
-         .append("- Omega-3s at least twice across the 3 days: fatty fish such as salmon, sardines or trout, or, if the client can't have fish, ")
+         .append("- Omega-3s at least twice across the 3 days: fatty fish such as salmon, sardines or trout, or, if the client can't have or doesn't like fish, ")
          .append("walnuts, chia seeds or ground flaxseed.\n")
          .append("- Choose whole grains over refined grains most of the time.\n")
          .append("- Keep added sugar low (under about 25g a day) and sodium moderate (under about 2,300mg a day): ")

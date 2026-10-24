@@ -35,6 +35,7 @@ class LiveAiCheck {
 
     @Autowired private MealPlanService mealPlanService;
     @Autowired private MacroCalculatorService macroService;
+    @Autowired private com.mealplanner.service.UserFoodPreferencesService preferencesService;
     @Autowired private UserRepository userRepository;
     @Autowired private AiCallLogRepository aiCallLogRepository;
 
@@ -75,8 +76,22 @@ class LiveAiCheck {
         run("4. Lower carb, gluten-free, likes to cook", p, null, prefs);
     }
 
-    private void run(String title, UserProfile profile, Integer rampWeek, String prefs) {
+    @Test
+    void pickyEverydayClient() {
+        // Picks saved the same way the plan form saves them, so the prompt is exactly what a client gets.
         User user = newUser();
+        preferencesService.savePreferences(user, "Ground beef, Chicken, Eggs, Rice, Potatoes, Green beans, Bananas",
+                "fish", "mostly-home-cooked", "flexible");
+        UserProfile p = new UserProfile(205, 5, 10, 52, "Male", "Occasionally Active", "Lose Weight", List.of());
+        run("5. Picky everyday client: beef, chicken, eggs, rice, potatoes; no fish", p, null,
+                preferencesService.buildPreferencesPrompt(user), user);
+    }
+
+    private void run(String title, UserProfile profile, Integer rampWeek, String prefs) {
+        run(title, profile, rampWeek, prefs, newUser());
+    }
+
+    private void run(String title, UserProfile profile, Integer rampWeek, String prefs, User user) {
         NutritionTargets nutrition = macroService.buildTargets(profile, rampWeek);
         MacroTargets targets = nutrition.toMacroTargets();
         StringBuilder out = new StringBuilder("\n===== LIVE " + title + " =====\n");
@@ -89,6 +104,7 @@ class LiveAiCheck {
 
         List<String> avoid = new java.util.ArrayList<>(profile.getAllergies());
         if (prefs != null && prefs.contains("mushrooms")) avoid.add("mushrooms");
+        if (prefs != null && prefs.contains("Foods to avoid: fish")) avoid.add("fish");
         out.append("Allergen hits: ").append(AllergenGuard.violations(avoid, plan)).append('\n');
         out.append("Problems after checks: ").append(PlanQualityCheck.problems(plan, targets)).append('\n');
         out.append("Accuracy score: ").append(PlanQualityCheck.accuracyScore(plan, targets)).append('\n');

@@ -100,6 +100,14 @@ class MealPlanPromptTest {
     }
 
     @Test
+    void promptAsksForAPersonalEverydayPlan() {
+        String prompt = service.buildPlanPrompt(profile(List.of()), targets, null);
+        assertThat(prompt).contains("This plan is for one specific person");
+        assertThat(prompt).contains("ground beef and rice");
+        assertThat(prompt).contains("ground beef, not bison");
+    }
+
+    @Test
     void recipesTakeTheirIngredientsFromTheFoodsList() {
         String prompt = service.buildPlanPrompt(profile(List.of()), targets, null);
         assertThat(prompt).doesNotContain("\"ingredients\"");

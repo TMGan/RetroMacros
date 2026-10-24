@@ -99,6 +99,10 @@ public class MainController {
             @RequestParam(name = "acceptDisclaimer", required = false, defaultValue = "false") boolean acceptDisclaimer,
             @RequestParam(required = false) List<String> allergies,
             @RequestParam(required = false, name = "otherAllergies") String otherAllergies,
+            @RequestParam(required = false, name = "likedFoods") List<String> likedFoods,
+            @RequestParam(required = false, name = "otherLikes") String otherLikes,
+            @RequestParam(required = false, name = "dislikes") String dislikes,
+            @RequestParam(required = false, name = "dietStyle") String dietStyle,
             Model model
     ) {
         User user = currentUserService.require(principal);
@@ -130,6 +134,10 @@ public class MainController {
         submitted.put("healthNotes", notes);
         submitted.put("allergies", allergies == null ? List.of() : allergies);
         submitted.put("otherAllergies", otherAllergies);
+        submitted.put("likedFoods", likedFoods == null ? List.of() : likedFoods);
+        submitted.put("otherLikes", otherLikes);
+        submitted.put("dislikes", dislikes);
+        submitted.put("dietStyle", dietStyle == null ? "flexible" : dietStyle);
 
         List<String> errors = validateInputs(weight, heightFeet, heightInches, age, sex, activityLevel, fitnessGoal);
         if (bodyFatPercentage != null && (bodyFatPercentage < 3 || bodyFatPercentage > 70)) {
@@ -163,6 +171,9 @@ public class MainController {
                     .filter(s -> !s.isBlank())
                     .forEach(allAllergies::add);
         }
+
+        // The food picks become the client's saved preferences, which the plan prompt is built around.
+        saveFoodPicks(user, likedFoods, otherLikes, dislikes, dietStyle);
 
         // Remember the health screen. A changed answer needs the coach to clear it again.
         String healthKeys = HealthCondition.join(health);
@@ -301,6 +312,8 @@ public class MainController {
         model.addAttribute("activityLevels", activityLevels());
         model.addAttribute("goals", goals());
         model.addAttribute("allergyOptions", allergyOptions());
+        model.addAttribute("foodOptions", FOOD_OPTIONS);
+        model.addAttribute("dietOptions", DIET_OPTIONS);
         model.addAttribute("healthOptions", HealthCondition.values());
         model.addAttribute("needsDisclaimer", user.getDisclaimerAcceptedAt() == null);
         model.addAttribute("rampWeekNow", MacroCalculatorService.rampWeek(user.getRampStartDate(), foodLogService.today(user)));
@@ -346,6 +359,7 @@ public class MainController {
         }
         checkInRepository.findTopByUserOrderByCheckInDateDesc(user)
                 .ifPresent(c -> p.put("weight", Math.round(c.getWeightLbs())));
+        prefillFoodPicks(p, user);
         return p;
     }
 
@@ -380,5 +394,59 @@ public class MainController {
 
     private List<String> allergyOptions() {
         return List.of("Dairy", "Eggs", "Peanuts", "Tree Nuts", "Soy", "Shellfish", "Fish", "Gluten/Wheat");
+    }
+
+    /** Everyday foods clients can tap on the plan form. Plain, common versions on purpose. */
+    static final Map<String, List<String>> FOOD_OPTIONS;
+    static {
+        Map<String, List<String>> m = new LinkedHashMap<>();
+        m.put("Proteins", List.of("Chicken", "Ground beef", "Ground turkey", "Steak", "Pork", "Salmon", "Tuna", "Shrimp",
+                "Eggs", "Greek yogurt", "Cottage cheese", "Beans and lentils", "Tofu", "Protein shakes"));
+        m.put("Carbs", List.of("Rice", "Potatoes", "Sweet potatoes", "Oatmeal", "Pasta", "Bread", "Tortillas", "Quinoa"));
+        m.put("Vegetables", List.of("Broccoli", "Green beans", "Salad greens", "Spinach", "Peppers", "Carrots",
+                "Zucchini", "Asparagus", "Frozen mixed vegetables"));
+        m.put("Fruit", List.of("Bananas", "Berries", "Apples", "Oranges", "Grapes"));
+        FOOD_OPTIONS = Collections.unmodifiableMap(m);
+    }
+    static final List<String> ALL_FOOD_OPTIONS = FOOD_OPTIONS.values().stream().flatMap(List::stream).toList();
+    /** Diet choices on the form: stored value, label. */
+    static final List<String[]> DIET_OPTIONS = List.of(
+            new String[]{"flexible", "No restrictions"},
+            new String[]{"vegetarian", "Vegetarian"},
+            new String[]{"vegan", "Vegan"},
+            new String[]{"pescatarian", "Pescatarian"});
+    private static final int MAX_FOOD_TEXT_LENGTH = 200;
+
+    /** Saves the form's food picks as the client's preferences, which every plan and swap prompt reads. */
+    private void saveFoodPicks(User user, List<String> likedFoods, String otherLikes, String dislikes, String dietStyle) {
+        List<String> liked = new ArrayList<>();
+        if (likedFoods != null) likedFoods.stream().filter(ALL_FOOD_OPTIONS::contains).distinct().forEach(liked::add);
+        String other = bound(otherLikes, MAX_FOOD_TEXT_LENGTH);
+        if (other != null && !other.isBlank()) liked.add(other);
+        UserFoodPreferences existing = preferencesService.getUserPreferences(user);
+        String cooking = existing != null && existing.getCookingPreference() != null ? existing.getCookingPreference() : "mostly-home-cooked";
+        boolean knownDiet = DIET_OPTIONS.stream().anyMatch(d -> d[0].equals(dietStyle));
+        String diet = knownDiet ? dietStyle : (existing != null && existing.getDietaryStyle() != null ? existing.getDietaryStyle() : "flexible");
+        preferencesService.savePreferences(user, String.join(", ", liked), bound(dislikes, MAX_FOOD_TEXT_LENGTH), cooking, diet);
+    }
+
+    /** Splits saved preferences back into the form's pills and free-text boxes. */
+    private void prefillFoodPicks(Map<String, Object> p, User user) {
+        List<String> liked = new ArrayList<>();
+        List<String> other = new ArrayList<>();
+        UserFoodPreferences prefs = preferencesService.getUserPreferences(user);
+        if (prefs != null && prefs.getPreferredFoodsText() != null) {
+            for (String item : prefs.getPreferredFoodsText().split(",")) {
+                String food = item.trim();
+                if (food.isEmpty()) continue;
+                String match = ALL_FOOD_OPTIONS.stream().filter(o -> o.equalsIgnoreCase(food)).findFirst().orElse(null);
+                if (match != null) liked.add(match); else other.add(food);
+            }
+        }
+        p.put("likedFoods", liked);
+        p.put("otherLikes", String.join(", ", other));
+        p.put("dislikes", prefs == null ? null : prefs.getAvoidedFoodsText());
+        String diet = prefs == null ? null : prefs.getDietaryStyle();
+        p.put("dietStyle", DIET_OPTIONS.stream().anyMatch(d -> d[0].equals(diet)) ? diet : "flexible");
     }
 }

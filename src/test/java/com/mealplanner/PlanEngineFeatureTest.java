@@ -192,6 +192,25 @@ class PlanEngineFeatureTest {
     }
 
     @Test
+    void foodPicksOnThePlanFormBecomeTheClientsPreferences() throws Exception {
+        User client = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true")
+                        .param("likedFoods", "Ground beef", "Rice", "Eggs", "Not a real option")
+                        .param("otherLikes", "cottage cheese").param("dislikes", "fish, olives").param("dietStyle", "flexible")
+                        .with(signedInAs(client)))
+                .andExpect(status().isOk());
+
+        String prompt = preferencesService.buildPreferencesPrompt(client);
+        assertThat(prompt).contains("Ground beef, Rice, Eggs, cottage cheese").doesNotContain("Not a real option");
+        assertThat(prompt).contains("Foods to avoid: fish, olives");
+
+        // Next time the form starts with their picks already tapped.
+        mvc.perform(get("/form").with(signedInAs(client)))
+                .andExpect(content().string(containsString("value=\"Ground beef\" checked")))
+                .andExpect(content().string(containsString("value=\"fish, olives\"")));
+    }
+
+    @Test
     void foodPreferencesLiveOnTheProfilePage() throws Exception {
         User client = invitedClient();
         mvc.perform(post("/preferences/save").param("preferredFoods", "salmon, rice").param("avoidedFoods", "mushrooms")
