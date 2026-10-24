@@ -95,6 +95,9 @@ public class User {
     public boolean isHealthCleared() { return Boolean.TRUE.equals(healthCleared); }
     public void setHealthCleared(Boolean healthCleared) { this.healthCleared = healthCleared; }
     public boolean hasHealthFlags() { return healthConditions != null && !healthConditions.isBlank(); }
+    /** Health answers that hold plans at maintenance until the coach clears them. */
+    public boolean hasReviewFlags() { return HealthCondition.needsReview(HealthCondition.parse(healthConditions)); }
+    public boolean isOnGlp1() { return HealthCondition.parse(healthConditions).contains(HealthCondition.GLP1); }
     public LocalDateTime getDisclaimerAcceptedAt() { return disclaimerAcceptedAt; }
     public void setDisclaimerAcceptedAt(LocalDateTime disclaimerAcceptedAt) { this.disclaimerAcceptedAt = disclaimerAcceptedAt; }
     public java.time.LocalDate getRampStartDate() { return rampStartDate; }

@@ -45,8 +45,10 @@ public class WeeklyAdjustmentService {
         if (week.equals(user.getAdjustmentCheckedWeek())) return 0;
         user.setAdjustmentCheckedWeek(week);
 
-        // No calorie cuts during pregnancy or for anyone with an eating disorder history.
-        boolean noCuts = health.contains(HealthCondition.PREGNANT) || health.contains(HealthCondition.EATING_DISORDER);
+        // No calorie cuts during pregnancy or for anyone with an eating disorder history. A GLP-1
+        // medication already makes the deficit, so a stall is for their doctor, not a smaller plan.
+        boolean noCuts = health.contains(HealthCondition.PREGNANT) || health.contains(HealthCondition.EATING_DISORDER)
+                || health.contains(HealthCondition.GLP1);
         int change = decide(MacroCalculatorService.goalKey(goal), checkInRepository.findByUserOrderByCheckInDateAsc(user),
                 today, user.getCalorieAdjustment(), user.getCalorieAdjustedOn(), onRamp, noCuts);
         if (change != 0) {

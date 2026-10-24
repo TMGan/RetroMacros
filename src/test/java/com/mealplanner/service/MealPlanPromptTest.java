@@ -99,6 +99,19 @@ class MealPlanPromptTest {
     }
 
     @Test
+    void glp1PlansAreSmallProteinFirstAndGentle() {
+        UserProfile p = profile(List.of());
+        p.setHealthConditions(java.util.EnumSet.of(com.mealplanner.model.HealthCondition.GLP1));
+        String prompt = service.buildPlanPrompt(p, targets, null);
+
+        assertThat(prompt).contains("Takes a GLP-1 medication");
+        assertThat(prompt).contains("Protein first");
+        assertThat(prompt).contains("no fried, greasy or very rich meals");
+        assertThat(prompt).contains("breakfast, lunch, dinner and 2 or 3 snacks");
+        assertThat(service.buildPlanPrompt(profile(List.of()), targets, null)).contains("breakfast, lunch, dinner and 1 or 2 snacks");
+    }
+
+    @Test
     void noHealthSectionWhenNothingWasChecked() {
         assertThat(service.buildPlanPrompt(profile(List.of()), targets, null)).doesNotContain("HEALTH (from");
     }
