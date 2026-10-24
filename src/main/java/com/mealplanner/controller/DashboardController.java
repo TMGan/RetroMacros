@@ -75,6 +75,13 @@ public class DashboardController {
         model.addAttribute("impersonating", viewingAs);
         model.addAttribute("checkInDue", !viewingAs && !currentUserService.isDemo(user) && progressService.missedCheckIn(user));
         model.addAttribute("measurementsDue", !viewingAs && !currentUserService.isDemo(user) && measurementService.isDue(user));
+        // Getting started: the three first steps, ticked off as the client does them.
+        boolean hasLog = !todaysFoodLogs.isEmpty() || !foodLogService.getLast7DaysFoodLogs(user).isEmpty();
+        boolean hasCheckIn = progressService.lastCheckInDate(user) != null;
+        model.addAttribute("starterPlan", latestPlan != null);
+        model.addAttribute("starterLog", hasLog);
+        model.addAttribute("starterCheckIn", hasCheckIn);
+        model.addAttribute("showStarter", !viewingAs && !currentUserService.isDemo(user) && !(latestPlan != null && hasLog && hasCheckIn));
         // A ramping client gets new targets each week; nudge them once the week has moved past their plan's.
         Integer rampWeekNow = com.mealplanner.service.MacroCalculatorService.rampWeek(user.getRampStartDate(), foodLogService.today(user));
         model.addAttribute("rampWeekNow", rampWeekNow);

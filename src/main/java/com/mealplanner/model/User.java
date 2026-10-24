@@ -62,6 +62,13 @@ public class User {
     @Column(name = "ramp_start_date")
     private java.time.LocalDate rampStartDate;
 
+    // Last day of full access, when the coach set one; otherwise the challenge default applies.
+    @Column(name = "access_until")
+    private java.time.LocalDate accessUntil;
+
+    public java.time.LocalDate getAccessUntil() { return accessUntil; }
+    public void setAccessUntil(java.time.LocalDate accessUntil) { this.accessUntil = accessUntil; }
+
     public String getHealthConditions() { return healthConditions; }
     public void setHealthConditions(String healthConditions) { this.healthConditions = healthConditions; }
     public String getHealthNotes() { return healthNotes; }

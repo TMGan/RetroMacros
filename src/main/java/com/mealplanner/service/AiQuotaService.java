@@ -34,7 +34,7 @@ public class AiQuotaService {
 
     public AiQuotaService(AiUsageRepository aiUsageRepository,
                           @Value("${ai.limit.plans-per-day:2}") int plansPerDay,
-                          @Value("${ai.limit.plans-per-week:5}") int plansPerWeek,
+                          @Value("${ai.limit.plans-per-week:2}") int plansPerWeek,
                           @Value("${ai.limit.swaps-per-day:10}") int swapsPerDay,
                           @Value("${ai.limit.estimates-per-day:40}") int estimatesPerDay,
                           @Value("${app.limit.food-logs-per-day:100}") int foodLogsPerDay,
@@ -61,13 +61,36 @@ public class AiQuotaService {
             throw new QuotaExceededException("You have reached today's limit of " + limit + " "
                     + label(kind) + ". It resets at midnight UTC.");
         }
-        // Plans are the expensive call, so they also have a weekly cap.
-        if (kind == Kind.PLAN && aiUsageRepository.sumRequestsSince(user, kind.name(), today.minusDays(6)) >= plansPerWeek) {
-            throw new QuotaExceededException("You've made " + plansPerWeek + " meal plans in the last 7 days, which is the weekly limit. "
-                    + "Your saved plans are under My Plans, and you can make a new one in a few days.");
+        // Plans also have a weekly cap, counted Monday to Sunday like the challenge weeks. The coach is exempt.
+        if (kind == Kind.PLAN && !user.isAdmin()
+                && plansThisWeek(user, today) >= plansPerWeek) {
+            throw new QuotaExceededException("You've made your " + plansPerWeek + " food plans for this week. "
+                    + "Your plans are under My Food Plan, and you can make a new one on Monday.");
         }
         usage.setRequestCount(usage.getRequestCount() + 1);
         aiUsageRepository.save(usage);
+    }
+
+    /** Hands back one use, for a request that failed without producing anything. */
+    @Transactional
+    public void refund(User user, Kind kind) {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        aiUsageRepository.findByUserAndKindAndUsageDate(user, kind.name(), today).ifPresent(usage -> {
+            usage.setRequestCount(Math.max(0, usage.getRequestCount() - 1));
+            aiUsageRepository.save(usage);
+        });
+    }
+
+    public long plansThisWeek(User user, LocalDate today) {
+        return aiUsageRepository.sumRequestsSince(user, Kind.PLAN.name(), ChallengeService.weekStart(today));
+    }
+
+    public long plansThisWeek(User user) {
+        return plansThisWeek(user, LocalDate.now(ZoneOffset.UTC));
+    }
+
+    public int getPlansPerWeek() {
+        return plansPerWeek;
     }
 
     private int limitFor(Kind kind) {

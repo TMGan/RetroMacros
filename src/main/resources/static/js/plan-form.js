@@ -116,6 +116,12 @@
         const other = v('otherAllergies').trim();
         if (other) allergies.push(other);
         set('allergies', allergies.length ? allergies.join(', ') : 'None');
+        const likes = checkedList('likedFoods');
+        const otherLikes = v('otherLikes').trim();
+        if (otherLikes) likes.push(otherLikes);
+        const dislikes = v('dislikes').trim();
+        set('likes', (likes.length ? likes.join(', ') : 'Nothing picked, so we\'ll use common foods')
+            + (dislikes ? '. Not: ' + dislikes : ''));
         const health = checkedList('healthConditions');
         set('health', health.length ? health.join(', ') : 'Nothing checked');
     }

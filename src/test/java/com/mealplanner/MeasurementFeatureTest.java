@@ -22,6 +22,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.oauth2Login;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -136,19 +137,17 @@ class MeasurementFeatureTest {
     }
 
     @Test
-    void progressAndAdminPagesShowTheDiagramAndHistory() throws Exception {
+    void measurementsShowForTheCoachButNotOnTheClientsProgressPage() throws Exception {
         User client = newUser(false);
         User coach = newUser(true);
-        mvc.perform(get("/progress").with(signedInAs(client)))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Take your starting measurements")))
-                .andExpect(content().string(containsString("name=\"m_calfLeft\"")));
-
         measurementService.save(client, LocalDate.now().minusDays(29), Map.of(com.mealplanner.model.BodyPart.WAIST, 35.0));
         measurementService.save(client, LocalDate.now(), Map.of(com.mealplanner.model.BodyPart.WAIST, 34.0));
+
+        // Clients get the simple page: no measurements tab, form or totals.
         mvc.perform(get("/progress").with(signedInAs(client)))
-                .andExpect(content().string(containsString("Total inches lost")))
-                .andExpect(content().string(containsString("last 34.0")));
+                .andExpect(status().isOk())
+                .andExpect(content().string(not(containsString("name=\"m_calfLeft\""))))
+                .andExpect(content().string(not(containsString("Total inches lost"))));
         mvc.perform(get("/admin/users/" + client.getId()).with(signedInAs(coach)))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("measurementData")));

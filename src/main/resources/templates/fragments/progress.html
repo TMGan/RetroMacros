@@ -68,10 +68,11 @@
     </div>
 </th:block>
 
-<!-- The rest of the picture: habits, how they feel, body composition, measurements if any. -->
-<th:block th:fragment="details(summary, msummary)">
+<!-- Habits for everyone. Feelings, body composition and measurements only on the coach's view:
+     clients get the simple version. -->
+<th:block th:fragment="details(summary, msummary, coachView)">
     <div class="row g-3 mb-4">
-        <div class="col-12 col-lg-6">
+        <div class="col-12" th:classappend="${coachView} ? 'col-lg-6' : ''">
             <div class="card neon h-100"><div class="card-body">
                 <h5 class="mb-1">Your habits</h5>
                 <p class="text-muted small mb-3">From your food log over the last 7 days.</p>
@@ -90,7 +91,7 @@
             </div></div>
         </div>
 
-        <div class="col-12 col-lg-6" th:if="${summary.feelings != null && !#lists.isEmpty(summary.feelings)}">
+        <div class="col-12 col-lg-6" th:if="${coachView and summary.feelings != null and !#lists.isEmpty(summary.feelings)}">
             <div class="card neon h-100"><div class="card-body">
                 <h5 class="mb-1">How you've been feeling</h5>
                 <p class="text-muted small mb-3">Your average out of 5, your first week next to the last 7 days.</p>
@@ -107,7 +108,7 @@
             </div></div>
         </div>
 
-        <div class="col-12 col-lg-6" th:if="${summary.composition != null && summary.composition.hasData}">
+        <div class="col-12 col-lg-6" th:if="${coachView and summary.composition != null and summary.composition.hasData}">
             <div class="card neon h-100"><div class="card-body">
                 <h5 class="mb-1">Lean vs fat mass</h5>
                 <p class="text-muted small mb-3">Worked out from your weight and body fat %.</p>
@@ -120,7 +121,7 @@
         </div>
 
         <!-- Only for clients who measure; nobody has to. -->
-        <div class="col-12 col-lg-6" th:if="${msummary != null and msummary.totalAbs != null}">
+        <div class="col-12 col-lg-6" th:if="${coachView and msummary != null and msummary.totalAbs != null}">
             <div class="card neon h-100"><div class="card-body">
                 <h5 class="mb-1">Measurements</h5>
                 <p class="text-muted small mb-3" th:text="'Since ' + ${#temporals.format(msummary.firstDate, 'MMM d')} + ', across every spot you measured.'">Since</p>

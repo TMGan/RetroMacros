@@ -9,14 +9,15 @@ public class WebConfig implements WebMvcConfigurer {
 
     private final AdminInterceptor adminInterceptor;
     private final ReadOnlyViewInterceptor readOnlyViewInterceptor;
-
     private final AccessCheckInterceptor accessCheckInterceptor;
+    private final ChallengeAccessInterceptor challengeAccessInterceptor;
 
     public WebConfig(AdminInterceptor adminInterceptor, ReadOnlyViewInterceptor readOnlyViewInterceptor,
-                     AccessCheckInterceptor accessCheckInterceptor) {
+                     AccessCheckInterceptor accessCheckInterceptor, ChallengeAccessInterceptor challengeAccessInterceptor) {
         this.adminInterceptor = adminInterceptor;
         this.readOnlyViewInterceptor = readOnlyViewInterceptor;
         this.accessCheckInterceptor = accessCheckInterceptor;
+        this.challengeAccessInterceptor = challengeAccessInterceptor;
     }
 
     @Override
@@ -26,5 +27,7 @@ public class WebConfig implements WebMvcConfigurer {
                 .excludePathPatterns("/css/**", "/js/**", "/images/**", "/webjars/**", "/login", "/error", "/home", "/about", "/disclaimer", "/demo-login");
         registry.addInterceptor(adminInterceptor).addPathPatterns("/admin", "/admin/**");
         registry.addInterceptor(readOnlyViewInterceptor).excludePathPatterns("/admin", "/admin/**");
+        // After a client's challenge access ends, everything outside the admin area is read-only.
+        registry.addInterceptor(challengeAccessInterceptor).excludePathPatterns("/admin", "/admin/**");
     }
 }

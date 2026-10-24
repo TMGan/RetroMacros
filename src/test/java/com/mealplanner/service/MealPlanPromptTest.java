@@ -100,6 +100,30 @@ class MealPlanPromptTest {
     }
 
     @Test
+    void promptAsksForAPersonalEverydayPlan() {
+        String prompt = service.buildPlanPrompt(profile(List.of()), targets, null);
+        assertThat(prompt).contains("This plan is for one specific person");
+        assertThat(prompt).contains("ground beef and rice");
+        assertThat(prompt).contains("ground beef, not bison");
+    }
+
+    @Test
+    void recipesTakeTheirIngredientsFromTheFoodsList() {
+        String prompt = service.buildPlanPrompt(profile(List.of()), targets, null);
+        assertThat(prompt).doesNotContain("\"ingredients\"");
+        assertThat(prompt).contains("the foods list is the ingredient list");
+
+        com.mealplanner.model.Meal meal = new com.mealplanner.model.Meal("Bowl",
+                List.of(new com.mealplanner.model.FoodItem("Chicken breast", "6 oz"), new com.mealplanner.model.FoodItem("Broccoli", "1 cup")),
+                new MacroTargets(500, 40, 50, 15));
+        com.mealplanner.model.Recipe recipe = new com.mealplanner.model.Recipe();
+        recipe.setName("Bowl");
+        meal.setRecipe(recipe);
+        MealPlanService.fillRecipeIngredients(meal);
+        assertThat(meal.getRecipe().getIngredients()).containsExactly("6 oz Chicken breast", "1 cup Broccoli");
+    }
+
+    @Test
     void swapPromptCarriesAllergiesAndPreferences() {
         String prompt = service.buildSwapPrompt(new MacroTargets(500, 40, 50, 15), "Salmon bowl", List.of("Dairy"), "- Foods to avoid: mushrooms");
 

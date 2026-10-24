@@ -21,14 +21,14 @@
 
     <!-- With errors from the server, open on the review step so nothing already entered is hidden. -->
     <form th:action="@{/generate}" method="post" class="card neon" id="mealPlanForm" novalidate
-          th:attr="data-start-step=${errors != null} ? 5 : 1">
+          th:attr="data-start-step=${errors != null} ? 6 : 1">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <div class="card-body p-4 p-md-5">
 
             <div class="wizard-head">
-                <div class="wizard-step-label"><span class="wizard-count">Step 1 of 5</span> · <span class="wizard-title">About you</span></div>
+                <div class="wizard-step-label"><span class="wizard-count">Step 1 of 6</span> · <span class="wizard-title">About you</span></div>
                 <div class="wizard-progress" aria-hidden="true">
-                    <span></span><span></span><span></span><span></span><span></span>
+                    <span></span><span></span><span></span><span></span><span></span><span></span>
                 </div>
             </div>
 
@@ -183,8 +183,36 @@
                 </label>
             </section>
 
-            <!-- Step 4: allergies and health -->
-            <section class="form-step" data-step="4" data-title="Allergies &amp; health">
+            <!-- Step 4: foods you like. This is what makes each plan theirs instead of generic. -->
+            <section class="form-step" data-step="4" data-title="Foods you like">
+                <h2 class="wizard-heading">What do you like to eat?</h2>
+                <p class="wizard-sub">Tap everything you'd happily eat. Your meals are built mostly from these. Pick as many as you like.</p>
+                <div th:each="group : ${foodOptions}" class="mb-3">
+                    <div class="food-group" th:text="${group.key}">Proteins</div>
+                    <div class="choice-row">
+                        <label class="choice-pill" th:each="food : ${group.value}">
+                            <input type="checkbox" name="likedFoods" th:value="${food}"
+                                   th:checked="${prefill.likedFoods != null and #lists.contains(prefill.likedFoods, food)}">
+                            <span th:text="${food}">Chicken</span>
+                        </label>
+                    </div>
+                </div>
+                <label for="otherLikes" class="form-label mt-2">Any other favorites? <span class="text-muted">(optional)</span></label>
+                <input type="text" id="otherLikes" name="otherLikes" class="form-control" maxlength="200" placeholder="e.g. cottage cheese, tortillas, pineapple" th:value="${prefill.otherLikes}">
+                <label for="dislikes" class="form-label mt-3">Foods you don't like <span class="text-muted">(optional)</span></label>
+                <input type="text" id="dislikes" name="dislikes" class="form-control" maxlength="200" placeholder="e.g. mushrooms, fish, olives" th:value="${prefill.dislikes}">
+
+                <span class="form-label d-block mt-3">Diet</span>
+                <div class="choice-row">
+                    <label class="choice-pill" th:each="d : ${dietOptions}">
+                        <input type="radio" name="dietStyle" th:value="${d[0]}" th:checked="${prefill.dietStyle == d[0]}">
+                        <span th:text="${d[1]}">No restrictions</span>
+                    </label>
+                </div>
+            </section>
+
+            <!-- Step 5: allergies and health -->
+            <section class="form-step" data-step="5" data-title="Allergies &amp; health">
                 <h2 class="wizard-heading">Any allergies?</h2>
                 <p class="wizard-sub">Your plan will never include these. Skip it if none apply.</p>
                 <div class="choice-row mb-3">
@@ -210,8 +238,8 @@
                           placeholder="e.g. high blood pressure, recent surgery" th:text="${prefill.healthNotes}"></textarea>
             </section>
 
-            <!-- Step 5: review -->
-            <section class="form-step" data-step="5" data-title="Review">
+            <!-- Step 6: review -->
+            <section class="form-step" data-step="6" data-title="Review">
                 <h2 class="wizard-heading">Look good?</h2>
                 <p class="wizard-sub">Check your answers, then build your plan. It takes about a minute.</p>
                 <dl class="review-list" id="reviewList">
@@ -220,8 +248,9 @@
                     <div><dt>Goal</dt><dd data-review="goal">-</dd><dd><button type="button" class="review-edit" data-goto="2">Edit</button></dd></div>
                     <div><dt>Eating style</dt><dd data-review="style">-</dd><dd><button type="button" class="review-edit" data-goto="3">Edit</button></dd></div>
                     <div><dt>Cooking</dt><dd data-review="effort">-</dd><dd><button type="button" class="review-edit" data-goto="3">Edit</button></dd></div>
-                    <div><dt>Allergies</dt><dd data-review="allergies">-</dd><dd><button type="button" class="review-edit" data-goto="4">Edit</button></dd></div>
-                    <div><dt>Health</dt><dd data-review="health">-</dd><dd><button type="button" class="review-edit" data-goto="4">Edit</button></dd></div>
+                    <div><dt>Foods you like</dt><dd data-review="likes">-</dd><dd><button type="button" class="review-edit" data-goto="4">Edit</button></dd></div>
+                    <div><dt>Allergies</dt><dd data-review="allergies">-</dd><dd><button type="button" class="review-edit" data-goto="5">Edit</button></dd></div>
+                    <div><dt>Health</dt><dd data-review="health">-</dd><dd><button type="button" class="review-edit" data-goto="5">Edit</button></dd></div>
                 </dl>
 
                 <details class="advanced">

@@ -62,7 +62,9 @@ public class UserFoodPreferencesService {
         StringBuilder sb = new StringBuilder();
         sb.append("CLIENT'S FOOD PREFERENCES:\n");
         if (prefs.getPreferredFoodsText() != null && !prefs.getPreferredFoodsText().isEmpty()) {
-            sb.append("- Foods they like and want: ").append(prefs.getPreferredFoodsText()).append("\n");
+            sb.append("- Foods they picked as ones they like: ").append(prefs.getPreferredFoodsText()).append("\n");
+            sb.append("  Build most meals from these. Repeating their favorites across the days is good; it's their plan. ")
+              .append("Add other everyday foods only to round out nutrition (for example a vegetable or a fruit they didn't pick).\n");
         }
         if (prefs.getAvoidedFoodsText() != null && !prefs.getAvoidedFoodsText().isEmpty()) {
             sb.append("- Foods to avoid: ").append(prefs.getAvoidedFoodsText()).append("\n");
