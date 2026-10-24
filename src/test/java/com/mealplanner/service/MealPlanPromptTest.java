@@ -70,7 +70,19 @@ class MealPlanPromptTest {
 
         assertThat(prompt).contains("KEEP IT SIMPLE");
         assertThat(prompt).contains("same breakfast on all 3 days");
+        assertThat(prompt).contains("Cook once, mix and match");
+        assertThat(prompt).contains("2 different lunches and 2 different dinners");
         assertThat(prompt).contains("rotisserie chicken");
+    }
+
+    @Test
+    void everyPlanGetsTheSauceRules() {
+        String prompt = service.buildPlanPrompt(profile(List.of()), targets, null);
+
+        assertThat(prompt).contains("FLAVOR (SAUCES AND SEASONINGS)");
+        assertThat(prompt).contains("Use freely (few calories): salsa");
+        assertThat(prompt).contains("Measure and count (more calories): olive oil");
+        assertThat(prompt).contains("so the day's totals include it");
     }
 
     @Test
