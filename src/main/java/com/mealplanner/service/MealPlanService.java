@@ -262,6 +262,18 @@ public class MealPlanService {
         }
         p.append("- Fitness goal: ").append(profile.getFitnessGoal()).append(".\n\n");
 
+        p.append("FLAVOR (SAUCES AND SEASONINGS):\n")
+         .append("- Use sauces and seasonings to turn the same foods into different dishes, for example chicken and rice as a taco bowl ")
+         .append("with salsa and lime, a teriyaki bowl, or lemon-herb with garlic.\n")
+         .append("- Use freely (few calories): salsa, pico de gallo, hot sauce, sriracha, mustard, lemon or lime juice, vinegar, ")
+         .append("fresh or dried herbs, spices and seasoning blends (taco, Italian, Cajun, lemon pepper), garlic, low-sodium soy sauce.\n")
+         .append("- Measure and count (more calories): olive oil, butter, mayo, ranch and other creamy dressings, BBQ sauce, teriyaki sauce, ")
+         .append("ketchup, honey, pesto, peanut sauce, cheese. Usually 1 to 2 tablespoons.\n")
+         .append("- Any sauce, dressing, oil or cooking fat with calories goes in \"foods\" with its amount (for example \"1 tbsp olive oil\"), ")
+         .append("so the day's totals include it.\n")
+         .append("- Sauces follow the allergy rules too: soy sauce, teriyaki and hoisin have soy and wheat; pesto has nuts and cheese; ")
+         .append("ranch, Caesar and aioli have dairy or eggs; Worcestershire has fish.\n\n");
+
         appendEffortRules(p, profile.getEffortLevel());
 
         p.append("ACCURACY:\n")
@@ -312,8 +324,13 @@ public class MealPlanService {
     private void appendEffortRules(StringBuilder p, String effort) {
         if (UserProfile.EFFORT_SIMPLE.equals(effort)) {
             p.append("EFFORT: KEEP IT SIMPLE. This client wants the least possible effort, so make the plan easy to follow:\n")
-             .append("- Use the same breakfast on all 3 days and the same lunch on all 3 days. Rotate between 2 dinners.\n")
-             .append("- About 5 ingredients per meal and under 10 minutes of hands-on time.\n")
+             .append("- Use the same breakfast on all 3 days.\n")
+             .append("- Cook once, mix and match: pick a short batch-cook list of 2 proteins, 2 carbs and 2 or 3 vegetables, ")
+             .append("and build every lunch and dinner from it. Make 2 different lunches and 2 different dinners and rotate them over the 3 days, ")
+             .append("swapping the protein, carb or vegetable and using a different sauce or seasoning so each one tastes like a new dish. ")
+             .append("A repeated meal keeps the same name. ")
+             .append("In the recipe steps, say when a meal uses food cooked earlier (for example \"use the chicken cooked on day 1\").\n")
+             .append("- About 5 ingredients per meal and under 10 minutes of hands-on time, not counting the one batch cook.\n")
              .append("- Convenience foods are encouraged: rotisserie chicken, frozen vegetable steam bags, microwave rice or quinoa pouches, ")
              .append("pre-cut vegetables, bagged salad kits with a light dressing, canned tuna or chicken, Greek yogurt cups, ready-to-drink protein shakes.\n")
              .append("- Vegetables still go in every main meal, in the easiest forms: baby carrots, snap peas, steam bags, salad kits, cherry tomatoes.\n")

@@ -19,14 +19,14 @@ public final class AllergenGuard {
 
     // Keywords for each allergy option on the plan form.
     private static final Map<String, List<String>> KEYWORDS = Map.of(
-            "dairy", List.of("milk", "cheese", "yogurt", "yoghurt", "butter", "cream", "whey", "casein", "ghee", "kefir", "parmesan", "mozzarella", "cheddar", "feta", "ricotta", "custard", "ice cream"),
-            "eggs", List.of("egg", "omelet", "omelette", "frittata", "mayonnaise", "mayo", "meringue"),
+            "dairy", List.of("milk", "cheese", "yogurt", "yoghurt", "butter", "cream", "whey", "casein", "ghee", "kefir", "parmesan", "mozzarella", "cheddar", "feta", "ricotta", "custard", "ice cream", "ranch", "alfredo", "queso", "tzatziki", "pesto", "caesar"),
+            "eggs", List.of("egg", "omelet", "omelette", "frittata", "mayonnaise", "mayo", "meringue", "aioli", "caesar"),
             "peanuts", List.of("peanut"),
-            "tree nuts", List.of("almond", "walnut", "cashew", "pecan", "pistachio", "hazelnut", "macadamia", "brazil nut", "pine nut", "praline", "marzipan", "nutella"),
-            "soy", List.of("soy", "tofu", "edamame", "tempeh", "miso", "tamari"),
+            "tree nuts", List.of("almond", "walnut", "cashew", "pecan", "pistachio", "hazelnut", "macadamia", "brazil nut", "pine nut", "praline", "marzipan", "nutella", "pesto"),
+            "soy", List.of("soy", "tofu", "edamame", "tempeh", "miso", "tamari", "teriyaki", "hoisin"),
             "shellfish", List.of("shrimp", "prawn", "crab", "lobster", "scallop", "clam", "mussel", "oyster", "crawfish", "crayfish"),
-            "fish", List.of("fish", "salmon", "tuna", "cod", "tilapia", "halibut", "trout", "sardine", "anchov", "mackerel", "haddock", "mahi", "snapper", "swordfish", "bass"),
-            "gluten/wheat", List.of("wheat", "bread", "pasta", "spaghetti", "noodle", "flour", "tortilla", "couscous", "barley", "rye", "bagel", "cracker", "pita", "naan", "cereal", "granola", "breadcrumb", "panko", "seitan", "bulgur", "farro", "toast", "bun", "wrap")
+            "fish", List.of("fish", "salmon", "tuna", "cod", "tilapia", "halibut", "trout", "sardine", "anchov", "mackerel", "haddock", "mahi", "snapper", "swordfish", "bass", "worcestershire", "caesar"),
+            "gluten/wheat", List.of("wheat", "bread", "pasta", "spaghetti", "noodle", "flour", "tortilla", "couscous", "barley", "rye", "bagel", "cracker", "pita", "naan", "cereal", "granola", "breadcrumb", "panko", "seitan", "bulgur", "farro", "toast", "bun", "wrap", "soy sauce", "teriyaki", "hoisin")
     );
 
     // Phrases that contain a keyword but are safe for that allergy.
@@ -35,7 +35,7 @@ public final class AllergenGuard {
                     "almond milk", "oat milk", "soy milk", "coconut milk", "rice milk", "cashew milk", "dairy-free", "dairy free",
                     "coconut cream", "cream of tartar"),
             "eggs", List.of("eggplant", "egg-free", "egg free"),
-            "gluten/wheat", List.of("gluten-free", "gluten free", "rice noodle", "corn tortilla", "lettuce wrap", "buckwheat",
+            "gluten/wheat", List.of("gluten-free soy sauce", "gluten free soy sauce", "gluten-free", "gluten free", "rice noodle", "corn tortilla", "lettuce wrap", "buckwheat",
                     "rice cracker", "rice pasta", "chickpea pasta", "lentil pasta")
     );
 

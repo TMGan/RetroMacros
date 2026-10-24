@@ -48,6 +48,17 @@ class AllergenGuardTest {
     }
 
     @Test
+    void catchesAllergensHiddenInSauces() {
+        assertThat(AllergenGuard.violations(List.of("Gluten/Wheat", "Soy"), meal("Dinner", "Chicken", "1 tbsp soy sauce")))
+                .containsExactlyInAnyOrder("Gluten/Wheat", "Soy");
+        assertThat(AllergenGuard.violations(List.of("Tree Nuts", "Dairy"), meal("Lunch", "Pasta", "2 tbsp basil pesto")))
+                .containsExactlyInAnyOrder("Tree Nuts", "Dairy");
+        assertThat(AllergenGuard.violations(List.of("Dairy"), meal("Lunch", "Salad", "2 tbsp light ranch"))).containsExactly("Dairy");
+        assertThat(AllergenGuard.violations(List.of("Fish"), meal("Dinner", "Steak", "1 tsp Worcestershire sauce"))).containsExactly("Fish");
+        assertThat(AllergenGuard.violations(List.of("Gluten/Wheat"), meal("Dinner", "Rice bowl", "1 tbsp gluten-free soy sauce"))).isEmpty();
+    }
+
+    @Test
     void noAllergiesMeansNoViolations() {
         assertThat(AllergenGuard.violations(List.of(), meal("Dinner", "Shrimp pasta with cheese"))).isEmpty();
         assertThat(AllergenGuard.violations(null, meal("Dinner", "Shrimp pasta with cheese"))).isEmpty();
