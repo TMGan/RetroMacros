@@ -8,67 +8,120 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&family=Audiowide&display=swap" rel="stylesheet">
     <link rel="stylesheet" th:href="@{/css/theme.css}" />
+    <style>
+        .about-lead { font-size: 1.1rem; color: var(--muted); margin-bottom: 2rem; }
+        .about-steps { list-style: none; padding: 0; margin: 0; counter-reset: step; }
+        .about-steps li { position: relative; padding-left: 2.75rem; margin-bottom: 1.25rem; counter-increment: step; }
+        .about-steps li:last-child { margin-bottom: 0; }
+        .about-steps li::before {
+            content: counter(step); position: absolute; left: 0; top: 0;
+            width: 1.9rem; height: 1.9rem; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 0.95rem;
+            color: var(--neon-blue); border: 1px solid var(--neon-blue);
+        }
+        .about-steps strong { display: block; margin-bottom: 2px; }
+        .about-steps p, .about-list li { margin: 0; line-height: 1.6; }
+        .about-list { padding-left: 1.1rem; margin: 0; }
+        .about-list li { margin-bottom: 10px; }
+        .about-list li:last-child { margin-bottom: 0; }
+        .about-steps strong, .about-list li strong { color: var(--neon-blue); }
+        .about-tech { font-size: 0.95rem; }
+    </style>
 </head>
 <body class="neon">
 <div th:replace="${user != null} ? ~{fragments/navbar :: authenticated-navbar} : ~{fragments/navbar :: public-navbar}"></div>
-
 <div class="container my-5">
     <div class="row">
         <div class="col-lg-8 mx-auto">
-            <h1 class="mb-4 section-title">About Retro Macros</h1>
+            <h1 class="mb-3 section-title">About Retro Macros</h1>
+            <p class="about-lead">
+                Retro Macros is the nutrition side of my coaching. You tell it about yourself, the foods you like
+                and anything health-related, and it builds a 3-day food plan you can actually follow, with recipes
+                and a grocery list. It's invite-only, for the people I coach.
+            </p>
 
             <div class="card neon mb-4"><div class="card-body">
-                <h3 class="card-title section-title">Our Mission</h3>
-                <p class="card-text">
-                    Retro Macros takes the guesswork out of nutrition planning. Whether you're trying to lose weight,
-                    build muscle, or maintain a healthy lifestyle, our AI-powered platform creates personalized meal
-                    plans that align with your goals.
+                <h2 class="h4 card-title section-title mb-3">How your plan is made</h2>
+                <ol class="about-steps">
+                    <li>
+                        <strong>Your calories</strong>
+                        <p>Your daily burn is estimated from your height, weight, age and activity. For fat loss, your
+                            target is 20% below that, and never below what your body burns at rest or a safe minimum.
+                            To maintain, you eat about what you burn. To build muscle, about 10% more.</p>
+                    </li>
+                    <li>
+                        <strong>Your protein, carbs and fat</strong>
+                        <p>Protein is set from your body weight (or your goal weight, if you set one), fat never drops
+                            below 20% of your calories, and carbs fill the rest. You choose the style: balanced, higher
+                            protein, higher carb or lower carb.</p>
+                    </li>
+                    <li>
+                        <strong>Your food</strong>
+                        <p>Meals are built from the foods you picked, at the effort you chose, from "keep it simple" to
+                            "I like to cook". Everyday groceries, a vegetable at every main meal, and sauces and
+                            seasonings so the same foods don't taste the same every day.</p>
+                    </li>
+                    <li>
+                        <strong>Checked before you see it</strong>
+                        <p>Every plan is checked for your allergies, and each day's numbers are added up again. If
+                            anything is off, the plan is fixed before it reaches you.</p>
+                    </li>
+                    <li>
+                        <strong>Adjusted as you go</strong>
+                        <p>Your weekly weigh-in keeps the plan current. If fat loss stalls for two weeks, calories come
+                            down 100 a day. If you're losing faster than 1% of your body weight a week, they go up 100.
+                            Your numbers stay the same through the week, so nothing changes mid-plan.</p>
+                    </li>
+                </ol>
+            </div></div>
+
+            <div class="card neon mb-4"><div class="card-body">
+                <h2 class="h4 card-title section-title mb-3">Built around your health</h2>
+                <ul class="about-list">
+                    <li><strong>Food first.</strong> Plans never suggest medications, weight-loss drugs or fat burners.
+                        The only extras are protein shakes (up to 2 a day) and creatine, which is recommended unless
+                        your health check says to ask your doctor first.</li>
+                    <li><strong>Health check.</strong> If you're pregnant or breastfeeding, have kidney disease, take
+                        medication for diabetes, or have a history of an eating disorder, your plan stays at
+                        maintenance calories until we talk.</li>
+                    <li><strong>GLP-1 medications.</strong> If you take one, like Ozempic or Zepbound, your plan switches
+                        to smaller, protein-first meals that are easier on your stomach.</li>
+                    <li><strong>Not medical advice.</strong> This is general nutrition guidance. Check with your doctor
+                        before changing your diet. <a th:href="@{/disclaimer}">Read the full disclaimer</a>.</li>
+                </ul>
+            </div></div>
+
+            <div class="card neon mb-4"><div class="card-body">
+                <h2 class="h4 card-title section-title mb-3">Who built it</h2>
+                <p class="mb-0">
+                    Built by Tim Gangadeen, a personal trainer who also writes software. I built it because the
+                    same meal plan doesn't work for everyone. People stick with food they like, in portions that fit
+                    their life, so every plan here starts with the person.
                 </p>
             </div></div>
 
-            <div class="card neon mb-4"><div class="card-body">
-                <h3 class="card-title section-title">How It Works</h3>
-                <p><strong>1. Smart Calculations:</strong> We use the Mifflin–St Jeor equation to calculate your BMR and TDEE.</p>
-                <p><strong>2. Goal-Based Macros:</strong> We apply a 30/40/30 macro split adjusted to your goal.</p>
-                <p><strong>3. AI Meal Generation:</strong> We generate plans with whole foods that meet targets and respect restrictions.</p>
-                <p><strong>4. Automatic Grocery Lists:</strong> Organized shopping lists for easy trips.</p>
-            </div></div>
-
-            <div class="card neon mb-4"><div class="card-body">
-                <h3 class="card-title section-title">Who Is This For?</h3>
-                <ul>
-                    <li><strong>Fitness Enthusiasts</strong> optimizing nutrition</li>
-                    <li><strong>Weight Loss Seekers</strong> aiming for sustainable change</li>
-                    <li><strong>Busy Professionals</strong> who want healthy structure</li>
-                    <li><strong>Meal Prep Lovers</strong> who like to plan ahead</li>
+            <div class="card neon mb-4"><div class="card-body about-tech">
+                <h2 class="h4 card-title section-title mb-3">How it's built</h2>
+                <ul class="about-list">
+                    <li><strong>Java and Spring Boot</strong> on the server, with Thymeleaf pages.</li>
+                    <li><strong>PostgreSQL</strong> for accounts, plans, food logs and check-ins.</li>
+                    <li><strong>Google sign-in</strong>, invite-only, with a separate coach dashboard.</li>
+                    <li><strong>Claude AI</strong> writes the meals. The math stays in code: calorie targets, macro
+                        floors, allergy checks, daily totals and weekly adjustments are all calculated and verified
+                        by the app, not left to the AI.</li>
+                    <li><strong>Over 100 automated tests</strong> run before any change goes live.</li>
                 </ul>
-            </div></div>
-
-            <div class="card neon mb-4"><div class="card-body">
-                <h3 class="card-title section-title">Technology Stack</h3>
-                <ul>
-                    <li><strong>Backend:</strong> Spring Boot 3.x</li>
-                    <li><strong>Frontend:</strong> Thymeleaf + Bootstrap 5</li>
-                    <li><strong>Auth:</strong> Google OAuth 2.0</li>
-                    <li><strong>AI:</strong> Anthropic Claude / OpenAI GPT</li>
-                    <li><strong>Database:</strong> PostgreSQL / H2</li>
-                </ul>
-            </div></div>
-
-            <div class="card neon mb-4"><div class="card-body">
-                <h3 class="card-title section-title">About the Creator</h3>
-                <p>Built by a trainer and developer blending practical nutrition with modern AI.</p>
             </div></div>
 
             <div class="text-center">
-                <a href="/login" class="btn btn-neon btn-lg">Get Started Today</a>
+                <a th:if="${user != null}" th:href="@{/form}" class="btn btn-neon btn-lg">Make my food plan</a>
+                <a th:if="${user == null}" th:href="@{/login}" class="btn btn-neon btn-lg">Sign in</a>
             </div>
         </div>
     </div>
 </div>
-
 <div th:replace="~{fragments/footer :: footer}"></div>
-
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
 </body>
 </html>
