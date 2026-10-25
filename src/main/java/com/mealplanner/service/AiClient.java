@@ -30,8 +30,11 @@ public class AiClient {
 
     /** What a call is for. Decides the model, output allowance and effort. */
     public enum Kind {
-        // Plans write 3 days of meals with recipes plus the model's own thinking; 16k ran out on fuller plans.
-        PLAN(true, 32000), PLAN_REPAIR(true, 32000), SWAP(true, 8000),
+        // Plans write 3 days of meals with recipes plus the model's own thinking. Most use about 20k,
+        // but plans with many rules (diabetes plus GLP-1: 6 eating times, even carbs) sometimes ran past
+        // 32k and were cut off, still billed. Only the tokens used are billed, so the higher cap is free
+        // for normal plans.
+        PLAN(true, 48000), PLAN_REPAIR(true, 32000), SWAP(true, 8000),
         ESTIMATE(false, 2000), SUGGESTION(false, 4000);
 
         final boolean usesPlanModel;
@@ -64,7 +67,7 @@ public class AiClient {
     public AiClient(AiCallLogRepository aiCallLogRepository,
                     Environment env,
                     @Value("${ai.api.key:}") String apiKey,
-                    @Value("${ai.timeout.ms:300000}") long timeoutMs,
+                    @Value("${ai.timeout.ms:480000}") long timeoutMs,
                     @Value("${ai.model.plan:claude-sonnet-5-5}") String planModel,
                     @Value("${ai.model.log:claude-haiku-5-5}") String logModel,
                     @Value("${ai.effort.plan:low}") String planEffort,

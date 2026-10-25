@@ -94,6 +94,15 @@ class LiveAiCheck {
         run("6. GLP-1 medication, fat loss", p, null, null);
     }
 
+    @Test
+    void diabetesAndGlp1Cleared() {
+        // Like the client whose plans kept getting cut off: both conditions, cleared by the coach.
+        UserProfile p = new UserProfile(212, 5, 10, 55, "Male", "Lightly Active", "Lose Weight", List.of());
+        p.setHealthConditions(EnumSet.of(HealthCondition.DIABETES_MEDS, HealthCondition.GLP1));
+        p.setHealthCleared(true);
+        run("7. Diabetes + GLP-1, cleared, fat loss", p, null, null);
+    }
+
     private void run(String title, UserProfile profile, Integer rampWeek, String prefs) {
         run(title, profile, rampWeek, prefs, newUser());
     }
@@ -106,7 +115,13 @@ class LiveAiCheck {
            .append("g (maintenance ").append(nutrition.getMaintenanceCalories()).append(", hold=").append(nutrition.isHealthHold()).append(")\n");
 
         long t0 = System.currentTimeMillis();
-        MealPlan plan = mealPlanService.generateMealPlan(user, profile, targets, prefs);
+        MealPlan plan;
+        try {
+            plan = mealPlanService.generateMealPlan(user, profile, targets, prefs);
+        } catch (RuntimeException ex) {
+            System.out.println(out + "FAILED: " + ex.getMessage() + "\n" + costs(user));
+            throw ex;
+        }
         out.append("Built in ").append((System.currentTimeMillis() - t0) / 1000).append("s\n");
 
         List<String> avoid = new java.util.ArrayList<>(profile.getAllergies());

@@ -227,7 +227,13 @@ public class MainController {
         if (weekPlan != null) keepWeekTargets(nutrition, weekPlan);
         MacroTargets targets = nutrition.toMacroTargets();
 
+        if (!currentUserService.isDemo(user) && aiQuotaService.tooManyFailedPlans(user)) {
+            return formWithErrors(model, user, submitted, List.of("Your plan didn't build a few times today, so we've paused "
+                    + "new plans until tomorrow. Your coach can see this. Please try again tomorrow, or text your coach."));
+        }
+
         // A plan that fails to build hands its uses back, so a hiccup never costs one of the client's weekly plans.
+        // The AI still charged for the attempt, though, so failures are counted (see tooManyFailedPlans).
         boolean saveCounted = false;
         boolean planCounted = false;
         try {
@@ -297,11 +303,13 @@ public class MainController {
             return formWithErrors(model, user, submitted, List.of(ex.getMessage()));
         } catch (AiClient.AiException ex) {
             refundUses(user, saveCounted, planCounted);
+            if (planCounted) aiQuotaService.recordFailedPlan(user);
             // These messages are written to be shown to clients (allergy refusals, outages, spend limits).
             log.warn("Meal plan generation failed for user {}: {}", user.getId(), ex.getMessage());
             return formWithErrors(model, user, submitted, List.of(ex.getMessage()));
         } catch (Exception ex) {
             refundUses(user, saveCounted, planCounted);
+            if (planCounted) aiQuotaService.recordFailedPlan(user);
             // Details stay in the server log; they can include raw provider responses.
             log.warn("Meal plan generation failed for user {}", user.getId(), ex);
             return formWithErrors(model, user, submitted, List.of("We couldn't generate your meal plan right now. Please try again in a minute."));
