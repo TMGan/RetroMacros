@@ -15,7 +15,7 @@ import java.time.ZoneOffset;
 public class AiQuotaService {
 
     /** AI kinds cap spend; the rest cap how much any account (including the public demo) can write per day. */
-    public enum Kind { PLAN, SWAP, ESTIMATE, FOOD_LOG, SWAP_RECORD, PLAN_SAVE }
+    public enum Kind { PLAN, SWAP, ESTIMATE, FOOD_LOG, SWAP_RECORD, PLAN_SAVE, PLAN_FAILURE }
 
     public static class QuotaExceededException extends RuntimeException {
         public QuotaExceededException(String message) {
@@ -31,6 +31,7 @@ public class AiQuotaService {
     private final int swapRecordsPerDay;
     private final int planSavesPerDay;
     private final int plansPerWeek;
+    private final int failedPlansPerDay;
 
     public AiQuotaService(AiUsageRepository aiUsageRepository,
                           @Value("${ai.limit.plans-per-day:2}") int plansPerDay,
@@ -39,7 +40,9 @@ public class AiQuotaService {
                           @Value("${ai.limit.estimates-per-day:40}") int estimatesPerDay,
                           @Value("${app.limit.food-logs-per-day:100}") int foodLogsPerDay,
                           @Value("${app.limit.swap-records-per-day:50}") int swapRecordsPerDay,
-                          @Value("${app.limit.plan-saves-per-day:20}") int planSavesPerDay) {
+                          @Value("${app.limit.plan-saves-per-day:20}") int planSavesPerDay,
+                          @Value("${ai.limit.failed-plans-per-day:3}") int failedPlansPerDay) {
+        this.failedPlansPerDay = failedPlansPerDay;
         this.foodLogsPerDay = foodLogsPerDay;
         this.swapRecordsPerDay = swapRecordsPerDay;
         this.planSavesPerDay = planSavesPerDay;
@@ -81,6 +84,27 @@ public class AiQuotaService {
         });
     }
 
+    /**
+     * Failed plans still cost real AI spend even though their use is handed back, so after a few
+     * failures in a day the client stops retrying until tomorrow. The coach is exempt.
+     */
+    public boolean tooManyFailedPlans(User user) {
+        if (user.isAdmin()) return false;
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        return aiUsageRepository.findByUserAndKindAndUsageDate(user, Kind.PLAN_FAILURE.name(), today)
+                .map(u -> u.getRequestCount() >= failedPlansPerDay)
+                .orElse(false);
+    }
+
+    @Transactional
+    public void recordFailedPlan(User user) {
+        LocalDate today = LocalDate.now(ZoneOffset.UTC);
+        AiUsage usage = aiUsageRepository.findByUserAndKindAndUsageDate(user, Kind.PLAN_FAILURE.name(), today)
+                .orElseGet(() -> new AiUsage(user, Kind.PLAN_FAILURE.name(), today));
+        usage.setRequestCount(usage.getRequestCount() + 1);
+        aiUsageRepository.save(usage);
+    }
+
     public long plansThisWeek(User user, LocalDate today) {
         return aiUsageRepository.sumRequestsSince(user, Kind.PLAN.name(), ChallengeService.weekStart(today));
     }
@@ -100,6 +124,7 @@ public class AiQuotaService {
             case FOOD_LOG: return foodLogsPerDay;
             case SWAP_RECORD: return swapRecordsPerDay;
             case PLAN_SAVE: return planSavesPerDay;
+            case PLAN_FAILURE: return failedPlansPerDay;
             default: return estimatesPerDay;
         }
     }
@@ -111,6 +136,7 @@ public class AiQuotaService {
             case FOOD_LOG: return "food log entries";
             case SWAP_RECORD: return "recorded swaps";
             case PLAN_SAVE: return "saved plans";
+            case PLAN_FAILURE: return "failed plans";
             default: return "macro estimates";
         }
     }

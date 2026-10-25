@@ -341,6 +341,20 @@ class PlanEngineFeatureTest {
     }
 
     @Test
+    void threeFailedPlansInADayPauseNewPlansUntilTomorrow() throws Exception {
+        User client = invitedClient();
+        for (int i = 0; i < 3; i++) {
+            mvc.perform(plan().param("acceptDisclaimer", "true").param("allergies", "Dairy").with(signedInAs(client)))
+                    .andExpect(content().string(containsString("Dairy")));
+        }
+        // Even a plan that would build is paused now, so failures can't keep running up AI costs.
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client)))
+                .andExpect(content().string(containsString("paused new plans until tomorrow")));
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client)).isEmpty();
+        assertThat(aiQuotaService.plansThisWeek(client)).isZero();
+    }
+
+    @Test
     void challengePageShowsTheRoutineAndWeeklyPlanCount() throws Exception {
         mvc.perform(get("/challenge").with(signedInAs(invitedClient())))
                 .andExpect(status().isOk())
