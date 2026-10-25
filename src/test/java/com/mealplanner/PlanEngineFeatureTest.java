@@ -44,6 +44,7 @@ class PlanEngineFeatureTest {
     @Autowired private com.mealplanner.service.UserFoodPreferencesService preferencesService;
     @Autowired private com.mealplanner.service.AiQuotaService aiQuotaService;
     @Autowired private com.mealplanner.repository.BodyCheckInRepository checkInRepository;
+    @Autowired private com.mealplanner.service.PlanBuildGuard planBuildGuard;
 
     private User invitedClient() {
         String email = UUID.randomUUID() + "@example.com";
@@ -119,7 +120,7 @@ class PlanEngineFeatureTest {
     void secondPlanOfTheWeekKeepsTheFirstPlansTargets() throws Exception {
         User client = invitedClient();
         mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
-        mvc.perform(plan().param("weight", "185").with(signedInAs(client))).andExpect(status().isOk());
+        mvc.perform(plan().param("weight", "185").param("again", "true").with(signedInAs(client))).andExpect(status().isOk());
 
         List<SavedMealPlan> plans = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client);
         assertThat(plans).hasSize(2);
@@ -129,7 +130,7 @@ class PlanEngineFeatureTest {
         // A new goal mid-week gets fresh numbers.
         User switcher = invitedClient();
         mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(switcher))).andExpect(status().isOk());
-        mvc.perform(plan().with(r -> { r.setParameter("fitnessGoal", "Maintain Weight"); return r; }).with(signedInAs(switcher)))
+        mvc.perform(plan().param("again", "true").with(r -> { r.setParameter("fitnessGoal", "Maintain Weight"); return r; }).with(signedInAs(switcher)))
                 .andExpect(status().isOk());
         List<SavedMealPlan> switched = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(switcher);
         assertThat(switched.get(0).getTargetCalories()).isGreaterThan(switched.get(1).getTargetCalories());
@@ -338,6 +339,43 @@ class PlanEngineFeatureTest {
 
         mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
         assertThat(aiQuotaService.plansThisWeek(client)).isEqualTo(1);
+    }
+
+    @Test
+    void aRepeatRightAfterAPlanPointsToItInsteadOfBuildingAnother() throws Exception {
+        User client = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
+        SavedMealPlan first = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0);
+
+        mvc.perform(plan().with(signedInAs(client)))
+                .andExpect(content().string(containsString("You made a food plan 1 minute ago")))
+                .andExpect(content().string(containsString("/plan/" + first.getId())))
+                .andExpect(content().string(containsString("Build a new plan anyway")))
+                .andExpect(content().string(containsString("alert alert-info")));
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client)).hasSize(1);
+        assertThat(aiQuotaService.plansThisWeek(client)).isEqualTo(1);
+
+        // Ticking the box builds it.
+        mvc.perform(plan().param("again", "true").with(signedInAs(client))).andExpect(status().isOk());
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client)).hasSize(2);
+    }
+
+    @Test
+    void aSecondPlanWaitsWhileTheFirstIsStillBuilding() throws Exception {
+        User client = invitedClient();
+        planBuildGuard.tryStart(client.getId());
+        try {
+            mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client)))
+                    .andExpect(content().string(containsString("Your plan is still being made")));
+            assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client)).isEmpty();
+            assertThat(aiQuotaService.plansThisWeek(client)).isZero();
+            // The blocked request doesn't release the slot the first plan holds.
+            assertThat(planBuildGuard.isBuilding(client.getId())).isTrue();
+        } finally {
+            planBuildGuard.finish(client.getId());
+        }
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
+        assertThat(planBuildGuard.isBuilding(client.getId())).isFalse();
     }
 
     @Test

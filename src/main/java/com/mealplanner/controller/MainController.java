@@ -33,6 +33,12 @@ public class MainController {
     private final AiQuotaService aiQuotaService;
     private final FoodLogService foodLogService;
     private final WeeklyAdjustmentService weeklyAdjustmentService;
+    private final PlanBuildGuard planBuildGuard;
+
+    static final String PLAN_STILL_BUILDING = "Your plan is still being made. It's usually ready in 2 to 3 minutes. "
+            + "Check My Food Plan in a couple of minutes.";
+    // A second plan this soon after the last one is almost always a retry after the page was lost.
+    static final int RECENT_PLAN_MINUTES = 15;
 
     private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(MainController.class);
     private static final int MAX_OTHER_ALLERGIES_LENGTH = 200;
@@ -49,7 +55,8 @@ public class MainController {
                           CurrentUserService currentUserService,
                           AiQuotaService aiQuotaService,
                           FoodLogService foodLogService,
-                          WeeklyAdjustmentService weeklyAdjustmentService) {
+                          WeeklyAdjustmentService weeklyAdjustmentService,
+                          PlanBuildGuard planBuildGuard) {
         this.macroService = macroService;
         this.mealPlanService = mealPlanService;
         this.userRepository = userRepository;
@@ -61,6 +68,7 @@ public class MainController {
         this.aiQuotaService = aiQuotaService;
         this.foodLogService = foodLogService;
         this.weeklyAdjustmentService = weeklyAdjustmentService;
+        this.planBuildGuard = planBuildGuard;
     }
 
     @GetMapping("/")
@@ -106,6 +114,7 @@ public class MainController {
             @RequestParam(required = false, name = "otherLikes") String otherLikes,
             @RequestParam(required = false, name = "dislikes") String dislikes,
             @RequestParam(required = false, name = "dietStyle") String dietStyle,
+            @RequestParam(name = "again", required = false, defaultValue = "false") boolean again,
             Model model
     ) {
         User user = currentUserService.require(principal);
@@ -163,6 +172,22 @@ public class MainController {
             errors.add("Please read and accept the disclaimer before building a plan.");
         }
         if (!errors.isEmpty()) return formWithErrors(model, user, submitted, errors);
+
+        // A plan takes a few minutes. A client who refreshes, loses the page on their phone, or comes
+        // back to the form shouldn't start a second paid plan by accident. Checked before anything is saved.
+        boolean demo = currentUserService.isDemo(user);
+        if (!demo && planBuildGuard.isBuilding(user.getId())) {
+            model.addAttribute("friendlyNotice", true);
+            return formWithErrors(model, user, submitted, List.of(PLAN_STILL_BUILDING));
+        }
+        SavedMealPlan recent = demo || again ? null : planMadeInLastMinutes(user, RECENT_PLAN_MINUTES);
+        if (recent != null) {
+            long minutes = Math.max(1, java.time.Duration.between(recent.getCreatedAt(), LocalDateTime.now()).toMinutes());
+            model.addAttribute("recentPlanId", recent.getId());
+            model.addAttribute("friendlyNotice", true);
+            return formWithErrors(model, user, submitted, List.of("You made a food plan " + minutes
+                    + (minutes == 1 ? " minute" : " minutes") + " ago, and it's saved under My Food Plan."));
+        }
 
         List<String> allAllergies = new ArrayList<>();
         // Only the known checkbox values; free text goes through the capped "other" box.
@@ -230,6 +255,13 @@ public class MainController {
         if (!currentUserService.isDemo(user) && aiQuotaService.tooManyFailedPlans(user)) {
             return formWithErrors(model, user, submitted, List.of("Your plan didn't build a few times today, so we've paused "
                     + "new plans until tomorrow. Your coach can see this. Please try again tomorrow, or text your coach."));
+        }
+
+        // Two requests can pass the early check together (a double tap), so claim the slot for real here.
+        boolean guarded = !demo;
+        if (guarded && !planBuildGuard.tryStart(user.getId())) {
+            model.addAttribute("friendlyNotice", true);
+            return formWithErrors(model, user, submitted, List.of(PLAN_STILL_BUILDING));
         }
 
         // A plan that fails to build hands its uses back, so a hiccup never costs one of the client's weekly plans.
@@ -313,7 +345,17 @@ public class MainController {
             // Details stay in the server log; they can include raw provider responses.
             log.warn("Meal plan generation failed for user {}", user.getId(), ex);
             return formWithErrors(model, user, submitted, List.of("We couldn't generate your meal plan right now. Please try again in a minute."));
+        } finally {
+            if (guarded) planBuildGuard.finish(user.getId());
         }
+    }
+
+    /** The client's latest plan if it was made within the last {@code minutes}, else null. */
+    private SavedMealPlan planMadeInLastMinutes(User user, int minutes) {
+        LocalDateTime since = LocalDateTime.now().minusMinutes(minutes);
+        return savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user).stream()
+                .filter(p -> !p.isGenerationFailed() && p.getCreatedAt() != null && p.getCreatedAt().isAfter(since))
+                .findFirst().orElse(null);
     }
 
     /**

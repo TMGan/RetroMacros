@@ -174,8 +174,8 @@ class SecurityHardeningTest {
         User alice = newUser(false);
 
         mvc.perform(generatePlan().with(signedInAs(alice)).with(csrf())).andExpect(status().isOk());
-        mvc.perform(generatePlan().with(signedInAs(alice)).with(csrf())).andExpect(status().isOk());
-        mvc.perform(generatePlan().with(signedInAs(alice)).with(csrf()))
+        mvc.perform(generatePlan().param("again", "true").with(signedInAs(alice)).with(csrf())).andExpect(status().isOk());
+        mvc.perform(generatePlan().param("again", "true").with(signedInAs(alice)).with(csrf()))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("reached today")));
 

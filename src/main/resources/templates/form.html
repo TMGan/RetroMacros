@@ -13,10 +13,17 @@
 <div th:replace="~{fragments/navbar :: authenticated-navbar}"></div>
 
 <div class="container plan-wizard my-4">
-    <div th:if="${errors}" class="alert alert-danger">
+    <div th:if="${errors}" class="alert" th:classappend="${friendlyNotice != null} ? 'alert-info' : 'alert-danger'">
         <ul class="mb-0">
             <li th:each="e : ${errors}" th:text="${e}"></li>
         </ul>
+        <div th:if="${recentPlanId != null}" class="mt-2">
+            <a th:href="@{/plan/{id}(id=${recentPlanId})}" class="btn btn-neon btn-sm">Open that plan</a>
+            <label class="d-flex align-items-center gap-2 mt-3 mb-0">
+                <input class="form-check-input mt-0" type="checkbox" name="again" value="true" form="mealPlanForm">
+                <span>Build a new plan anyway (uses one of this week's plans)</span>
+            </label>
+        </div>
     </div>
 
     <!-- With errors from the server, open on the review step so nothing already entered is hidden. -->
