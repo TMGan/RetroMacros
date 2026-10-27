@@ -82,12 +82,9 @@ public class DashboardController {
         model.addAttribute("starterLog", hasLog);
         model.addAttribute("starterCheckIn", hasCheckIn);
         model.addAttribute("showStarter", !viewingAs && !currentUserService.isDemo(user) && !(latestPlan != null && hasLog && hasCheckIn));
-        // A ramping client gets new targets each week; nudge them once the week has moved past their plan's.
-        Integer rampWeekNow = com.mealplanner.service.MacroCalculatorService.rampWeek(user.getRampStartDate(), foodLogService.today(user));
-        model.addAttribute("rampWeekNow", rampWeekNow);
-        model.addAttribute("rampNewWeek", !viewingAs && latestPlan != null && latestPlan.getRampWeek() != null
-                && !java.util.Objects.equals(latestPlan.getRampWeek(), rampWeekNow == null ? 4 : rampWeekNow)
-                && (rampWeekNow == null || rampWeekNow > latestPlan.getRampWeek()));
+        // The easing-in ramp is off. A client whose current plan came from it has reduced targets,
+        // so nudge them to make a new plan for their full ones.
+        model.addAttribute("rampNewWeek", !viewingAs && latestPlan != null && latestPlan.getRampWeek() != null);
         return "dashboard";
     }
 }

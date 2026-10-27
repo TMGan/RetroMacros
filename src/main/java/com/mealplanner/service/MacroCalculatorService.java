@@ -243,7 +243,7 @@ public class MacroCalculatorService {
         if (UserProfile.STYLE_HIGH_PROTEIN.equals(style)) return 1.0;
         if (UserProfile.STYLE_HIGH_CARB.equals(style)) return 0.6;
         if (UserProfile.STYLE_LOW_CARB.equals(style)) return 0.8;
-        return 0.7;
+        return 0.8;
     }
 
     private static double fatShare(String style) {

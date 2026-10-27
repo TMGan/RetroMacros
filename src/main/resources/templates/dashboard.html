@@ -69,7 +69,7 @@
     <!-- At most one nudge at a time, most useful first. -->
     <a class="today-nudge" th:if="${rampNewWeek}" href="/form">
         <i class="bi bi-arrow-up-right-circle"></i>
-        <span th:text="${rampWeekNow != null} ? 'Week ' + ${rampWeekNow} + ' of 4 has started. Make a new plan for this week.' : 'Your 4 weeks of easing in are done. Make a new plan for your full targets.'">Week 2 started</span>
+        <span>Your targets have been updated. Make a new plan to get them.</span>
     </a>
     <a class="today-nudge" th:if="${!rampNewWeek and checkInDue}" href="/progress#checkin">
         <i class="bi bi-graph-up-arrow"></i> <span>Time for a check-in. Log your weight.</span>

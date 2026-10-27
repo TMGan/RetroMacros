@@ -167,24 +167,37 @@ class PlanEngineFeatureTest {
     }
 
     @Test
-    void simpleRampedPlanShowsTheWeekAndCreatine() throws Exception {
+    void simplePlanGetsFullTargetsFromDayOne() throws Exception {
         User client = invitedClient();
+        // An old form or bookmark may still send ramp=true; the ramp is off, so it's ignored.
         mvc.perform(plan().param("acceptDisclaimer", "true").param("effortLevel", "simple").param("ramp", "true")
                         .with(signedInAs(client)))
                 .andExpect(status().isOk())
-                .andExpect(content().string(containsString("Easing in · week 1 of 4")))
+                .andExpect(content().string(not(containsString("Easing in"))))
                 .andExpect(content().string(containsString("Daily supplement: creatine monohydrate")))
                 .andExpect(content().string(containsString("Fiber")));
 
         SavedMealPlan saved = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0);
-        assertThat(saved.getRampWeek()).isEqualTo(1);
+        assertThat(saved.getRampWeek()).isNull();
         assertThat(saved.getEffortLevel()).isEqualTo("simple");
         assertThat(saved.getAccuracyScore()).isNotNull();
-        assertThat(userRepository.findById(client.getId()).orElseThrow().getRampStartDate()).isNotNull();
+        mvc.perform(get("/form").with(signedInAs(client)))
+                .andExpect(content().string(not(containsString("Ease me in gradually"))));
+    }
+
+    @Test
+    void aClientOnAnOldRampPlanIsNudgedToMakeANewOne() throws Exception {
+        User client = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
+        SavedMealPlan saved = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0);
+        saved.setRampWeek(1);
+        savedMealPlanRepository.save(saved);
 
         mvc.perform(get("/dashboard").with(signedInAs(client)))
-                .andExpect(status().isOk())
-                .andExpect(content().string(containsString("easing in week 1 of 4")));
+                .andExpect(content().string(containsString("Your targets have been updated. Make a new plan to get them.")));
+        // The new plan doesn't copy the old ramp plan's reduced numbers.
+        mvc.perform(plan().param("again", "true").with(signedInAs(client))).andExpect(status().isOk());
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0).getRampWeek()).isNull();
     }
 
     @Test
