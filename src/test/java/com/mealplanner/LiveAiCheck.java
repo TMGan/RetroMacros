@@ -104,6 +104,14 @@ class LiveAiCheck {
     }
 
     @Test
+    void shortFiftyYearOldWomanFatLoss() {
+        // The client who got 1,883 cal / 77 g protein / 252 g carbs before the ramp was switched off.
+        UserProfile p = new UserProfile(159, 5, 1, 50, "Female", "Occasionally Active", "Lose Weight", List.of());
+        p.setGoalWeight(130.0);
+        run("9. 5'1\" woman, 159 lb, age 50, fat loss", p, null, null);
+    }
+
+    @Test
     void diabetesGlp1NoSalmon() {
         // The same client's second report: salmon showed up although they avoid it.
         User user = newUser();
