@@ -71,6 +71,11 @@ public class NutritionTargets {
     public void setReferenceWeight(double referenceWeight) { this.referenceWeight = referenceWeight; }
     public Integer getRampWeek() { return rampWeek; }
     public void setRampWeek(Integer rampWeek) { this.rampWeek = rampWeek; }
+    // True when the coach set the calories by hand.
+    private boolean coachSet;
+    public boolean isCoachSet() { return coachSet; }
+    public void setCoachSet(boolean coachSet) { this.coachSet = coachSet; }
+
     public boolean isHealthHold() { return healthHold; }
     public void setHealthHold(boolean healthHold) { this.healthHold = healthHold; }
     public boolean isFloorApplied() { return floorApplied; }

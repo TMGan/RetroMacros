@@ -103,6 +103,18 @@ class LiveAiCheck {
         run("7. Diabetes + GLP-1, cleared, fat loss", p, null, null);
     }
 
+    @Test
+    void diabetesGlp1NoSalmon() {
+        // The same client's second report: salmon showed up although they avoid it.
+        User user = newUser();
+        preferencesService.savePreferences(user, "Chicken, Eggs, Rice, Broccoli", "No salmon", "mostly-home-cooked", "flexible");
+        UserProfile p = new UserProfile(205, 5, 10, 65, "Male", "Occasionally Active", "Lose Weight", List.of());
+        p.setHealthConditions(EnumSet.of(HealthCondition.DIABETES_MEDS, HealthCondition.GLP1));
+        p.setHealthCleared(true);
+        p.setAvoidedFoods(preferencesService.avoidedFoods(user));
+        run("8. Diabetes + GLP-1, cleared, no salmon", p, null, preferencesService.buildPreferencesPrompt(user), user);
+    }
+
     private void run(String title, UserProfile profile, Integer rampWeek, String prefs) {
         run(title, profile, rampWeek, prefs, newUser());
     }
@@ -125,6 +137,7 @@ class LiveAiCheck {
         out.append("Built in ").append((System.currentTimeMillis() - t0) / 1000).append("s\n");
 
         List<String> avoid = new java.util.ArrayList<>(profile.getAllergies());
+        avoid.addAll(profile.getAvoidedFoods());
         if (prefs != null && prefs.contains("mushrooms")) avoid.add("mushrooms");
         if (prefs != null && prefs.contains("Foods to avoid: fish")) avoid.add("fish");
         out.append("Allergen hits: ").append(AllergenGuard.violations(avoid, plan)).append('\n');

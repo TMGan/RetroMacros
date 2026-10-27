@@ -101,6 +101,16 @@ public class UserProfile {
     public boolean isHealthCleared() { return healthCleared; }
     public void setHealthCleared(boolean healthCleared) { this.healthCleared = healthCleared; }
 
+    // The client's "foods to avoid". Checked in code like allergies, but a miss isn't dangerous.
+    private java.util.List<String> avoidedFoods = java.util.List.of();
+    public java.util.List<String> getAvoidedFoods() { return avoidedFoods; }
+    public void setAvoidedFoods(java.util.List<String> avoidedFoods) { this.avoidedFoods = avoidedFoods == null ? java.util.List.of() : avoidedFoods; }
+
+    // Daily calories the coach set for this client, or null to use the formula.
+    private Integer calorieOverride;
+    public Integer getCalorieOverride() { return calorieOverride; }
+    public void setCalorieOverride(Integer calorieOverride) { this.calorieOverride = calorieOverride; }
+
     // Weekly change from weigh-ins (see WeeklyAdjustmentService), in calories a day.
     private int calorieAdjustment;
     public int getCalorieAdjustment() { return calorieAdjustment; }

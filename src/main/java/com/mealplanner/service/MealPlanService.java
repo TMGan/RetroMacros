@@ -53,19 +53,26 @@ public class MealPlanService {
             return checkedSamplePlan(profile, targets);
         }
         List<String> allergies = profile.getAllergies();
+        List<String> avoided = profile.getAvoidedFoods();
         String prompt = buildPlanPrompt(profile, targets, extraPrompt);
         MealPlan plan = requestPlan(user, prompt, targets);
 
-        // Allergies, vegetables and the day totals are checked in code, not left to the prompt.
+        // Allergies, avoided foods, vegetables and the day totals are checked in code, not left to the prompt.
         // Anything wrong gets one retry with the problems spelled out.
         Set<String> violations = AllergenGuard.violations(allergies, plan);
+        Set<String> avoidedHits = AllergenGuard.violations(avoided, plan);
         List<String> problems = PlanQualityCheck.problems(plan, targets);
-        if (!violations.isEmpty() || !problems.isEmpty()) {
-            log.warn("Plan for user {} needs a retry: allergens={} problems={}", user == null ? null : user.getId(), violations, problems);
+        if (!violations.isEmpty() || !avoidedHits.isEmpty() || !problems.isEmpty()) {
+            log.warn("Plan for user {} needs a retry: allergens={} avoided={} problems={}",
+                    user == null ? null : user.getId(), violations, avoidedHits, problems);
             StringBuilder fix = new StringBuilder("\n\nIMPORTANT: A previous attempt had these problems. Fix all of them:\n");
             if (!violations.isEmpty()) {
                 fix.append("- It used ").append(String.join(", ", violations))
                    .append(", which this client must not eat. Use none of it in any form.\n");
+            }
+            if (!avoidedHits.isEmpty()) {
+                fix.append("- It used ").append(String.join(", ", avoidedHits))
+                   .append(", which this client doesn't eat. Leave it out completely and use something else.\n");
             }
             for (String problem : problems) fix.append("- ").append(problem).append('\n');
             plan = requestPlan(user, prompt + fix, targets);
@@ -74,8 +81,11 @@ public class MealPlanService {
                 throw new AiClient.AiException("We couldn't build a plan that avoids " + String.join(", ", violations)
                         + ". Please try again.", null);
             }
-            // Missing vegetables or off totals after a retry are not dangerous: keep the plan and tell the coach.
-            plan.setQualityNotes(PlanQualityCheck.problems(plan, targets));
+            // Anything left after a retry is not dangerous: keep the plan and tell the coach.
+            List<String> notes = new ArrayList<>(PlanQualityCheck.problems(plan, targets));
+            avoidedHits = AllergenGuard.violations(avoided, plan);
+            if (!avoidedHits.isEmpty()) notes.add("Still contains a food the client avoids: " + String.join(", ", avoidedHits));
+            plan.setQualityNotes(notes);
         }
         return plan;
     }
@@ -213,6 +223,10 @@ public class MealPlanService {
              .append(". Leave these out of every meal, ingredient, sauce and garnish, including foods made from them ")
              .append("(for example dairy includes milk, cheese, yogurt, butter, cream and whey; gluten includes bread, pasta and flour tortillas).\n");
         }
+        if (!profile.getAvoidedFoods().isEmpty()) {
+            p.append("- The client doesn't eat: ").append(String.join(", ", profile.getAvoidedFoods()))
+             .append(". Leave these out of every meal, the same as an allergy, even where another rule below names them as an example.\n");
+        }
         p.append("- Each day must hit these targets: ").append(targets.getCalories()).append(" calories (within 50), ")
          .append(targets.getProtein()).append("g protein (within 5g), ")
          .append(targets.getCarbs()).append("g carbs (within 8g), ")
@@ -245,7 +259,7 @@ public class MealPlanService {
          .append("- Color variety: at least 3 different colors of vegetables and fruit each day, for a wide range of vitamins and minerals.\n")
          .append("- 1 to 2 servings of fruit a day.\n")
          .append("- Omega-3s at least twice across the 3 days: fatty fish such as salmon, sardines or trout, or, if the client can't have or doesn't like fish, ")
-         .append("walnuts, chia seeds or ground flaxseed.\n")
+         .append("walnuts, chia seeds or ground flaxseed. If the client avoids one fish, use another they eat or those plant options.\n")
          .append("- Choose whole grains over refined grains most of the time.\n")
          .append("- Keep added sugar low (under about 25g a day) and sodium moderate (under about 2,300mg a day): ")
          .append("avoid salty processed meats, instant noodles and regular canned soups.\n")
@@ -384,7 +398,7 @@ public class MealPlanService {
             meal = parseSingleMeal(sanitizeToJson(aiClient.complete(user, AiClient.Kind.SWAP, prompt
                     + "\nIMPORTANT: A previous attempt used " + String.join(", ", violations) + ". Use none of it in any form.")));
             if (!AllergenGuard.violations(allergies, meal).isEmpty()) {
-                throw new AiClient.AiException("We couldn't find a swap that avoids your allergies. Please try again.", null);
+                throw new AiClient.AiException("We couldn't find a swap that avoids your allergies and the foods you don't eat. Please try again.", null);
             }
         }
         fillRecipeIngredients(meal);

@@ -25,6 +25,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(properties = {
@@ -339,6 +340,49 @@ class PlanEngineFeatureTest {
 
         mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client))).andExpect(status().isOk());
         assertThat(aiQuotaService.plansThisWeek(client)).isEqualTo(1);
+    }
+
+    @Test
+    void afterTheCoachClearsAHeldClientTheNextPlanDropsTheHold() throws Exception {
+        User client = invitedClient();
+        mvc.perform(plan().param("acceptDisclaimer", "true").param("healthConditions", "diabetes").with(signedInAs(client)))
+                .andExpect(content().string(containsString("set to maintenance calories")));
+        int held = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0).getTargetCalories();
+
+        User cleared = userRepository.findById(client.getId()).orElseThrow();
+        cleared.setHealthCleared(true);
+        userRepository.save(cleared);
+
+        // Same week, same answers: the week lock must not copy the held maintenance numbers.
+        mvc.perform(plan().param("healthConditions", "diabetes").param("again", "true").with(signedInAs(client)))
+                .andExpect(content().string(not(containsString("set to maintenance calories"))));
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0).getTargetCalories()).isLessThan(held);
+    }
+
+    @Test
+    void theCoachCanSetAClientsCalories() throws Exception {
+        User client = invitedClient();
+        User coach = userRepository.findByEmail("coach@example.com").orElseGet(() -> userRepository.save(new User("coach@example.com", "Coach", "gid-coach-" + UUID.randomUUID())));
+        coach.setAdmin(true);
+        userRepository.save(coach);
+
+        mvc.perform(post("/admin/users/" + client.getId() + "/calories").param("calories", "900").with(signedInAs(coach)).with(csrf()))
+                .andExpect(redirectedUrl("/admin/users/" + client.getId() + "?caloriesInvalid=true"));
+        mvc.perform(post("/admin/users/" + client.getId() + "/calories").param("calories", "1900").with(signedInAs(coach)).with(csrf()))
+                .andExpect(redirectedUrl("/admin/users/" + client.getId() + "?caloriesSaved=true"));
+        mvc.perform(get("/admin/users/" + client.getId()).with(signedInAs(coach)))
+                .andExpect(content().string(containsString("value=\"1900\"")));
+
+        mvc.perform(plan().param("acceptDisclaimer", "true").with(signedInAs(client)))
+                .andExpect(content().string(containsString("Your coach set your daily calories")));
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0).getTargetCalories()).isEqualTo(1900);
+
+        // A client can't set it.
+        mvc.perform(post("/admin/users/" + client.getId() + "/calories").param("calories", "3000").with(signedInAs(client)).with(csrf()))
+                .andExpect(status().isForbidden());
+        // Blank goes back to the formula.
+        mvc.perform(post("/admin/users/" + client.getId() + "/calories").with(signedInAs(coach)).with(csrf()));
+        assertThat(userRepository.findById(client.getId()).orElseThrow().getCalorieOverride()).isNull();
     }
 
     @Test

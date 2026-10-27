@@ -153,6 +153,13 @@ public class MacroCalculatorService {
         } else if (!healthHold) {
             calories = tdee + Math.max(0, adjustment);
         }
+        // The coach's own number wins over the formula, a health hold and weekly adjustments.
+        if (p.getCalorieOverride() != null) {
+            calories = p.getCalorieOverride();
+            healthHold = false;
+            t.setFloorApplied(false);
+            t.setCoachSet(true);
+        }
 
         double ref = referenceWeight(p);
         double protein;

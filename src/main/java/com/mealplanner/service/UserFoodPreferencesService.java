@@ -47,6 +47,27 @@ public class UserFoodPreferencesService {
         return String.join(", ", cleaned);
     }
 
+    /** The client's "foods to avoid", one food per entry, for the code-side check on plans and swaps. */
+    public List<String> avoidedFoods(User user) {
+        UserFoodPreferences prefs = getUserPreferences(user);
+        if (prefs == null || isBlank(prefs.getAvoidedFoodsText())) return List.of();
+        return parseAvoidedFoods(prefs.getAvoidedFoodsText());
+    }
+
+    // Clients write "no salmon" or "I don't like mushrooms and olives"; the check needs just the foods.
+    private static final java.util.regex.Pattern LEAD_IN = java.util.regex.Pattern.compile(
+            "^(i\\s+)?(really\\s+)?(no|not|avoid|hate|dislike|don'?t\\s+(like|eat|want)|do\\s+not\\s+(like|eat|want)|can'?t\\s+eat)\\s+");
+
+    static List<String> parseAvoidedFoods(String text) {
+        return Arrays.stream(text.toLowerCase(java.util.Locale.ROOT).split("[,;/\\n]|\\band\\b|\\bor\\b"))
+                .map(String::trim)
+                .map(s -> LEAD_IN.matcher(s).replaceFirst("").trim())
+                .map(s -> s.replaceAll("[.!]+$", "").trim())
+                .filter(s -> !s.isEmpty())
+                .distinct()
+                .collect(Collectors.toList());
+    }
+
     public boolean hasPreferences(User user) {
         return preferencesRepository.existsByUser(user);
     }

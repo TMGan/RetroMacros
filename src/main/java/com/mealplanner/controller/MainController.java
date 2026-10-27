@@ -241,6 +241,8 @@ public class MainController {
         profile.setHealthConditions(health);
         profile.setHealthNotes(user.getHealthNotes());
         profile.setHealthCleared(user.isHealthCleared());
+        profile.setAvoidedFoods(preferencesService.avoidedFoods(user));
+        profile.setCalorieOverride(user.getCalorieOverride());
         profile.setCalorieAdjustment(user.getCalorieAdjustment());
 
         NutritionTargets nutrition;
@@ -363,7 +365,10 @@ public class MainController {
      * health answers, or null. Changing any of those gets fresh targets mid-week.
      */
     private SavedMealPlan firstPlanThisWeek(User user, LocalDate today, String goal, String macroStyle, String healthKeys) {
-        if (UserProfile.STYLE_CUSTOM.equals(macroStyle)) return null;
+        // A coach-set number is already fixed, and a custom split can't be compared.
+        if (UserProfile.STYLE_CUSTOM.equals(macroStyle) || user.getCalorieOverride() != null) return null;
+        // Once the coach clears a held client (or a new answer puts them on hold), the held plan's numbers no longer apply.
+        boolean onHoldNow = HealthCondition.needsReview(HealthCondition.parse(healthKeys)) && !user.isHealthCleared();
         LocalDate weekStart = ChallengeService.weekStart(today);
         SavedMealPlan first = null;
         for (SavedMealPlan p : savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user)) {
@@ -371,7 +376,8 @@ public class MainController {
             if (!p.isGenerationFailed()
                     && Objects.equals(p.getFitnessGoal(), goal)
                     && Objects.equals(p.getMacroStyle(), macroStyle)
-                    && Objects.toString(p.getHealthConditions(), "").equals(healthKeys)) {
+                    && Objects.toString(p.getHealthConditions(), "").equals(healthKeys)
+                    && Boolean.TRUE.equals(p.getHealthHold()) == onHoldNow) {
                 first = p;
             }
         }

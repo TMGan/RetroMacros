@@ -77,17 +77,17 @@
             <!-- Step 2: activity and goal -->
             <section class="form-step" data-step="2" data-title="Activity &amp; goal">
                 <h2 class="wizard-heading">How active are you?</h2>
-                <p class="wizard-sub">Pick what matches a normal week, not your best week.</p>
+                <p class="wizard-sub">Think about your whole day, not just your workouts. Pick what matches a normal week, and if you're between two, pick the lower one.</p>
                 <div class="row row-cols-1 row-cols-md-2 g-3 mb-4">
                     <div class="col" th:each="lvl : ${activityLevels}">
                         <label class="choice-card">
                             <input type="radio" name="activityLevel" th:value="${lvl}" required th:checked="${prefill.activityLevel == lvl}">
                             <span class="choice-title" th:text="${lvl}">Sedentary</span>
                             <span class="choice-sub" th:switch="${lvl}">
-                                <th:block th:case="'Sedentary'">Desk job, little to no exercise</th:block>
-                                <th:block th:case="'Occasionally Active'">Light exercise 1 to 2 days a week</th:block>
-                                <th:block th:case="'Moderately Active'">Exercise 3 to 5 days a week</th:block>
-                                <th:block th:case="'Very Active'">Hard exercise 6 to 7 days a week</th:block>
+                                <th:block th:case="'Sedentary'">Sitting most of the day, little or no exercise</th:block>
+                                <th:block th:case="'Occasionally Active'">Sitting most of the day, with workouts 1 to 3 days a week</th:block>
+                                <th:block th:case="'Moderately Active'">Workouts 3 to 5 days a week, and on your feet a good part of the day</th:block>
+                                <th:block th:case="'Very Active'">Hard training 6 to 7 days a week, or a job on your feet all day</th:block>
                             </span>
                         </label>
                     </div>

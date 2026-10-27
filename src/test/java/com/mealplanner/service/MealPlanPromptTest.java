@@ -156,4 +156,35 @@ class MealPlanPromptTest {
         assertThat(prompt).contains("Foods to avoid: mushrooms");
         assertThat(prompt).contains("clearly different from: Salmon bowl");
     }
+    @Test
+    void avoidedFoodsAreAHardRuleAndOverrideExamples() {
+        UserProfile p = profile(List.of());
+        p.setAvoidedFoods(List.of("salmon"));
+        String prompt = service.buildPlanPrompt(p, targets, null);
+
+        assertThat(prompt).contains("The client doesn't eat: salmon. Leave these out of every meal");
+        assertThat(prompt).contains("If the client avoids one fish, use another they eat");
+        assertThat(service.buildPlanPrompt(profile(List.of()), targets, null)).doesNotContain("The client doesn't eat");
+    }
+
+    @Test
+    void aPlanWithAnAvoidedFoodIsRedoneWithoutIt() throws Exception {
+        AiClient ai = org.mockito.Mockito.mock(AiClient.class);
+        MealPlanService live = new MealPlanService(ai, false, false);
+        UserProfile p = profile(List.of());
+        p.setAvoidedFoods(List.of("salmon"));
+        com.fasterxml.jackson.databind.ObjectMapper json = new com.fasterxml.jackson.databind.ObjectMapper();
+        String withSalmon = json.writeValueAsString(new MealPlanService(null, true, false).generateSampleMealPlan(p, targets));
+        assertThat(withSalmon.toLowerCase()).contains("salmon");
+        String withoutSalmon = withSalmon.replaceAll("(?i)salmon", "chicken");
+        org.mockito.Mockito.when(ai.complete(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(AiClient.Kind.PLAN), org.mockito.ArgumentMatchers.anyString()))
+                .thenReturn(withSalmon, withoutSalmon);
+
+        com.mealplanner.model.MealPlan plan = live.generateMealPlan(null, p, targets, null);
+
+        assertThat(AllergenGuard.violations(List.of("salmon"), plan)).isEmpty();
+        org.mockito.ArgumentCaptor<String> prompts = org.mockito.ArgumentCaptor.forClass(String.class);
+        org.mockito.Mockito.verify(ai, org.mockito.Mockito.times(2)).complete(org.mockito.ArgumentMatchers.any(), org.mockito.ArgumentMatchers.eq(AiClient.Kind.PLAN), prompts.capture());
+        assertThat(prompts.getAllValues().get(1)).contains("which this client doesn't eat");
+    }
 }
