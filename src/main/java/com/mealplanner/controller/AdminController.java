@@ -159,6 +159,22 @@ public class AdminController {
         return "redirect:/admin/users/" + userId + "?accessSaved=true";
     }
 
+    /** The coach sets a client's daily calories by hand, or clears it (blank) to go back to the formula. */
+    @PostMapping("/users/{userId}/calories")
+    public String setCalorieOverride(@AuthenticationPrincipal OAuth2User principal, @PathVariable Long userId,
+                                     @RequestParam(required = false) Integer calories) {
+        requireAdmin(principal);
+        User client = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (calories != null && (calories < 1200 || calories > 5000)) {
+            return "redirect:/admin/users/" + userId + "?caloriesInvalid=true";
+        }
+        client.setCalorieOverride(calories);
+        userRepository.save(client);
+        auditLogRepository.save(new AdminAuditLog(getCurrentUser(principal).getEmail(), "CALORIE_OVERRIDE",
+                "user:" + userId + " " + (calories == null ? "formula" : calories)));
+        return "redirect:/admin/users/" + userId + "?caloriesSaved=true";
+    }
+
     /** The coach undoes the weekly weigh-in changes. It applies from the client's next new-week plan. */
     @PostMapping("/users/{userId}/calorie-adjustment/reset")
     public String resetCalorieAdjustment(@AuthenticationPrincipal OAuth2User principal, @PathVariable Long userId) {

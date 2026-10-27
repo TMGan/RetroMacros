@@ -104,7 +104,6 @@ public class MainController {
             @RequestParam(name = "carbsPercent", required = false, defaultValue = "40") int carbsPercent,
             @RequestParam(name = "fatPercent", required = false, defaultValue = "30") int fatPercent,
             @RequestParam(name = "effortLevel", required = false, defaultValue = UserProfile.EFFORT_STANDARD) String effortLevel,
-            @RequestParam(name = "ramp", required = false, defaultValue = "false") boolean ramp,
             @RequestParam(name = "healthConditions", required = false) List<String> healthConditions,
             @RequestParam(name = "healthNotes", required = false) String healthNotes,
             @RequestParam(name = "acceptDisclaimer", required = false, defaultValue = "false") boolean acceptDisclaimer,
@@ -141,7 +140,6 @@ public class MainController {
         submitted.put("carbsPercent", carbsPercent);
         submitted.put("fatPercent", fatPercent);
         submitted.put("effortLevel", effortLevel);
-        submitted.put("ramp", ramp);
         submitted.put("healthConditions", health.stream().map(HealthCondition::getKey).toList());
         submitted.put("healthNotes", notes);
         submitted.put("allergies", allergies == null ? List.of() : allergies);
@@ -213,18 +211,15 @@ public class MainController {
         user.setGoalWeightLbs(goalWeight == null ? null : Math.round(goalWeight * 10) / 10.0);
 
         LocalDate today = foodLogService.today(user);
-        Integer rampWeek = null;
-        if (ramp) {
-            if (user.getRampStartDate() == null) user.setRampStartDate(today);
-            rampWeek = MacroCalculatorService.rampWeek(user.getRampStartDate(), today);
-        } else {
-            user.setRampStartDate(null);
-        }
+        // The 4-week easing-in ramp is switched off: its first weeks were close to maintenance, which
+        // isn't fat loss. Everyone gets their full targets, and anyone who was ramping moves to them now.
+        // (MacroCalculatorService can still build ramp targets if it's ever wanted again.)
+        user.setRampStartDate(null);
         // Targets change once a week: a second plan in the same week keeps the first one's numbers,
         // and the weigh-in adjustment only runs with the first plan of a new week.
         SavedMealPlan weekPlan = firstPlanThisWeek(user, today, fitnessGoal, macroStyle, healthKeys);
         int weeklyChange = weekPlan == null
-                ? weeklyAdjustmentService.update(user, fitnessGoal, today, rampWeek != null, health)
+                ? weeklyAdjustmentService.update(user, fitnessGoal, today, false, health)
                 : 0;
         userRepository.save(user);
 
@@ -241,11 +236,13 @@ public class MainController {
         profile.setHealthConditions(health);
         profile.setHealthNotes(user.getHealthNotes());
         profile.setHealthCleared(user.isHealthCleared());
+        profile.setAvoidedFoods(preferencesService.avoidedFoods(user));
+        profile.setCalorieOverride(user.getCalorieOverride());
         profile.setCalorieAdjustment(user.getCalorieAdjustment());
 
         NutritionTargets nutrition;
         try {
-            nutrition = macroService.buildTargets(profile, rampWeek);
+            nutrition = macroService.buildTargets(profile, null);
         } catch (IllegalArgumentException iae) {
             return formWithErrors(model, user, submitted, List.of(iae.getMessage()));
         }
@@ -363,7 +360,10 @@ public class MainController {
      * health answers, or null. Changing any of those gets fresh targets mid-week.
      */
     private SavedMealPlan firstPlanThisWeek(User user, LocalDate today, String goal, String macroStyle, String healthKeys) {
-        if (UserProfile.STYLE_CUSTOM.equals(macroStyle)) return null;
+        // A coach-set number is already fixed, and a custom split can't be compared.
+        if (UserProfile.STYLE_CUSTOM.equals(macroStyle) || user.getCalorieOverride() != null) return null;
+        // Once the coach clears a held client (or a new answer puts them on hold), the held plan's numbers no longer apply.
+        boolean onHoldNow = HealthCondition.needsReview(HealthCondition.parse(healthKeys)) && !user.isHealthCleared();
         LocalDate weekStart = ChallengeService.weekStart(today);
         SavedMealPlan first = null;
         for (SavedMealPlan p : savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user)) {
@@ -371,7 +371,10 @@ public class MainController {
             if (!p.isGenerationFailed()
                     && Objects.equals(p.getFitnessGoal(), goal)
                     && Objects.equals(p.getMacroStyle(), macroStyle)
-                    && Objects.toString(p.getHealthConditions(), "").equals(healthKeys)) {
+                    && Objects.toString(p.getHealthConditions(), "").equals(healthKeys)
+                    && Boolean.TRUE.equals(p.getHealthHold()) == onHoldNow
+                    // A plan from the old easing-in ramp had reduced targets; don't carry them forward.
+                    && p.getRampWeek() == null) {
                 first = p;
             }
         }
@@ -407,7 +410,6 @@ public class MainController {
         model.addAttribute("dietOptions", DIET_OPTIONS);
         model.addAttribute("healthOptions", HealthCondition.values());
         model.addAttribute("needsDisclaimer", user.getDisclaimerAcceptedAt() == null);
-        model.addAttribute("rampWeekNow", MacroCalculatorService.rampWeek(user.getRampStartDate(), foodLogService.today(user)));
     }
 
     /** Starts the form from the last plan and the latest weigh-in, so targets follow the client's progress. */
@@ -425,7 +427,6 @@ public class MainController {
         p.put("carbsPercent", 40);
         p.put("fatPercent", 30);
         p.put("bmrFormula", "mifflin-st-jeor");
-        p.put("ramp", user.getRampStartDate() != null);
         p.put("healthConditions", HealthCondition.parse(user.getHealthConditions()).stream().map(HealthCondition::getKey).toList());
         p.put("healthNotes", user.getHealthNotes());
         p.put("allergies", List.of());

@@ -78,7 +78,9 @@ public class MealApiController {
             );
             // Swaps follow the same allergies (from the client's latest plan) and preferences as the plan.
             List<SavedMealPlan> latest = savedMealPlanRepository.findTop10ByUserOrderByCreatedAtDesc(user);
-            List<String> allergies = latest.isEmpty() ? List.of() : latest.get(0).getAllergyList();
+            // Foods the client avoids are kept out of swaps the same way as allergies.
+            List<String> allergies = new java.util.ArrayList<>(latest.isEmpty() ? List.of() : latest.get(0).getAllergyList());
+            allergies.addAll(preferencesService.avoidedFoods(user));
             String preferences = preferencesService.buildPreferencesPrompt(user) + "\n" + swapService.buildLearnedPreferencesPrompt(user);
             Meal replacement = mealPlanService.generateReplacementMeal(user, target, cleanHint(req.avoidSimilarTo), allergies, preferences);
             if (replacement == null) {

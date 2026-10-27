@@ -33,8 +33,8 @@ class NutritionTargetsTest {
 
         assertThat(t.getCalories()).isCloseTo((int) Math.round(t.getMaintenanceCalories() * 0.8), org.assertj.core.data.Offset.offset(1));
         assertThat(t.isFloorApplied()).isFalse();
-        // Balanced: 0.7 g protein per lb.
-        assertThat(t.getProtein()).isEqualTo(140);
+        // Balanced: 0.8 g protein per lb.
+        assertThat(t.getProtein()).isEqualTo(160);
         assertThat(macroCalories(t)).isCloseTo(t.getCalories(), org.assertj.core.data.Offset.offset(15));
     }
 
@@ -76,12 +76,26 @@ class NutritionTargetsTest {
     }
 
     @Test
+    void aShortFiftyYearOldWomanGetsARealFatLossTarget() {
+        // The client who got 1,883 cal / 77 g protein / 252 g carbs from the old ramp and 0.7 g/lb.
+        UserProfile p = person(159, 5, 1, 50, "Female", "Occasionally Active", "Lose Weight");
+        p.setGoalWeight(130.0);
+
+        NutritionTargets t = calc.buildTargets(p, null);
+
+        assertThat(t.getCalories()).isBetween(1380, 1430);
+        assertThat(t.getProtein()).isEqualTo(104);
+        assertThat(t.getCarbs()).isBetween(130, 150);
+        assertThat(t.getRampWeek()).isNull();
+    }
+
+    @Test
     void largerClientsGetProteinFromAHealthyReferenceWeight() {
         // 300 lb at 5'6" is a BMI near 48; protein follows the weight at BMI 25 (about 155 lb).
         NutritionTargets t = calc.buildTargets(person(300, 5, 6, 50, "Female", "Sedentary", "Lose Weight"), null);
 
         assertThat(t.getReferenceWeight()).isBetween(150.0, 160.0);
-        assertThat(t.getProtein()).isBetween(100, 115);
+        assertThat(t.getProtein()).isBetween(118, 130);
     }
 
     @Test

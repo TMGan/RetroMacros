@@ -85,6 +85,10 @@
                 <i class="bi bi-shield-check"></i>
                 Calories are set to a safe minimum, so you never eat less than your body needs at rest.
             </p>
+            <p class="target-note" th:if="${nutrition != null and nutrition.coachSet}">
+                <i class="bi bi-person-check"></i>
+                Your coach set your daily calories.
+            </p>
             <p class="target-note" th:if="${weeklyChange != null and weeklyChange != 0}">
                 <i class="bi bi-arrow-repeat"></i>
                 <span th:text="${weeklyChange > 0}

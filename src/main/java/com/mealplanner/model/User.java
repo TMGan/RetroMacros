@@ -78,6 +78,13 @@ public class User {
     @Column(name = "calorie_adjusted_on")
     private java.time.LocalDate calorieAdjustedOn;
 
+    // Daily calories the coach set by hand. Replaces the formula (and weekly adjustments) until cleared.
+    @Column(name = "calorie_override")
+    private Integer calorieOverride;
+
+    public Integer getCalorieOverride() { return calorieOverride; }
+    public void setCalorieOverride(Integer calorieOverride) { this.calorieOverride = calorieOverride; }
+
     public int getCalorieAdjustment() { return calorieAdjustment == null ? 0 : calorieAdjustment; }
     public void setCalorieAdjustment(Integer calorieAdjustment) { this.calorieAdjustment = calorieAdjustment; }
     public java.time.LocalDate getAdjustmentCheckedWeek() { return adjustmentCheckedWeek; }

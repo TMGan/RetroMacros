@@ -111,7 +111,7 @@
         set('style', isCustom()
             ? 'Custom: ' + sliderValue('proteinPercent') + '% protein, ' + sliderValue('carbsPercent') + '% carbs, ' + sliderValue('fatPercent') + '% fat'
             : checkedLabel('macroStyle'));
-        set('effort', checkedLabel('effortLevel') + (document.getElementById('ramp').checked ? ', easing in over 4 weeks' : ''));
+        set('effort', checkedLabel('effortLevel'));
         const allergies = checkedList('allergies');
         const other = v('otherAllergies').trim();
         if (other) allergies.push(other);
@@ -158,12 +158,6 @@
     }));
     document.getElementById('customSplit').hidden = !isCustom();
     updateSplit();
-
-    // Easing in is the default for "keep it simple"; the client can still untick it.
-    const ramp = document.getElementById('ramp');
-    form.querySelectorAll('input[name="effortLevel"]').forEach(r => r.addEventListener('change', () => {
-        if (r.checked && r.value === 'simple') ramp.checked = true;
-    }));
 
     // Body fat is only needed for the Katch-McArdle formula.
     const formula = document.getElementById('bmrFormula');

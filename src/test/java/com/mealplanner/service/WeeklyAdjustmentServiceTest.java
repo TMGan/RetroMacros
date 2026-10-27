@@ -93,6 +93,23 @@ class WeeklyAdjustmentServiceTest {
     }
 
     @Test
+    void theCoachsCaloriesWinOverTheFormulaHoldAndAdjustment() {
+        MacroCalculatorService calc = new MacroCalculatorService();
+        UserProfile p = new UserProfile(200, 5, 10, 65, "male", "Moderately Active", "Lose Weight", List.of());
+        p.setHealthConditions(java.util.EnumSet.of(com.mealplanner.model.HealthCondition.DIABETES_MEDS));
+        p.setCalorieAdjustment(-100);
+        p.setCalorieOverride(1900);
+
+        NutritionTargets t = calc.buildTargets(p, null);
+
+        assertThat(t.getCalories()).isEqualTo(1900);
+        assertThat(t.isCoachSet()).isTrue();
+        assertThat(t.isHealthHold()).isFalse();
+        // Macros are still split from the coach's number.
+        assertThat(t.getProtein() * 4 + t.getCarbs() * 4 + t.getFat() * 9).isBetween(1880, 1920);
+    }
+
+    @Test
     void adjustmentMovesTheTargetButNeverBelowTheFloor() {
         MacroCalculatorService calc = new MacroCalculatorService();
         UserProfile p = new UserProfile(200, 5, 10, 40, "male", "Moderately Active", "Lose Weight", List.of());
