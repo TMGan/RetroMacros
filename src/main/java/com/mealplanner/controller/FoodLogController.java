@@ -57,6 +57,9 @@ public class FoodLogController {
         this.aiQuotaService = aiQuotaService;
     }
 
+    // The history page shows today and the 6 days before it. Food can be added to any of them.
+    private static final int HISTORY_DAYS = 7;
+
     @PostMapping("/add")
     public String addFoodLog(@AuthenticationPrincipal OAuth2User principal,
                              @RequestParam String mealName,
@@ -66,15 +69,18 @@ public class FoodLogController {
                              @RequestParam int carbs,
                              @RequestParam int fat,
                              @RequestParam(required = false, name = "timezone") String timezone,
+                             @RequestParam(required = false, name = "logDate")
+                             @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) LocalDate logDate,
                              RedirectAttributes redirectAttributes) {
         User user = currentUserService.require(principal);
-        String error = saveLog(user, mealName, foodDescription, calories, protein, carbs, fat, timezone, false);
+        String error = saveLog(user, mealName, foodDescription, calories, protein, carbs, fat, timezone, false, logDate);
         if (error != null) {
             redirectAttributes.addFlashAttribute("error", error);
         } else {
             redirectAttributes.addFlashAttribute("success", "Food logged successfully!");
         }
-        return "redirect:/dashboard";
+        // Food added to a chosen day came from the history page, so go back there.
+        return logDate != null ? "redirect:/food-log/history" : "redirect:/dashboard";
     }
 
     @PostMapping("/quick-add")
@@ -88,7 +94,7 @@ public class FoodLogController {
                                        @RequestParam(required = false, name = "timezone") String timezone,
                                        RedirectAttributes redirectAttributes) {
         User user = currentUserService.require(principal);
-        String error = saveLog(user, mealName, foodDescription, calories, protein, carbs, fat, timezone, true);
+        String error = saveLog(user, mealName, foodDescription, calories, protein, carbs, fat, timezone, true, null);
         if (error != null) {
             redirectAttributes.addFlashAttribute("error", error);
         } else {
@@ -97,10 +103,14 @@ public class FoodLogController {
         return "redirect:/dashboard";
     }
 
-    /** Validates and stores one entry. Returns an error message, or null on success. */
+    /**
+     * Validates and stores one entry. Returns an error message, or null on success.
+     *
+     * @param logDate the day it counts toward, within the history page's days; null means today
+     */
     private String saveLog(User user, String mealName, String foodDescription,
                            int calories, int protein, int carbs, int fat,
-                           String timezone, boolean fromMealPlan) {
+                           String timezone, boolean fromMealPlan, LocalDate logDate) {
         String description = foodDescription == null ? "" : foodDescription.trim();
         String meal = mealName == null ? "" : mealName.trim();
         if (description.isEmpty() || description.length() > MAX_DESCRIPTION_LENGTH) {
@@ -122,13 +132,18 @@ public class FoodLogController {
                 userRepository.save(user);
             } catch (Exception ignore) {}
         }
+        ZoneId zone = foodLogService.zoneFor(user);
+        LocalDate today = LocalDate.now(zone);
+        LocalDate day = logDate == null ? today : logDate;
+        if (day.isAfter(today) || day.isBefore(today.minusDays(HISTORY_DAYS - 1))) {
+            return "You can add food to today or the past " + (HISTORY_DAYS - 1) + " days.";
+        }
         // Caps writes for every account, including the public demo, so nobody can fill the database.
         try {
             aiQuotaService.consume(user, AiQuotaService.Kind.FOOD_LOG);
         } catch (AiQuotaService.QuotaExceededException e) {
             return e.getMessage();
         }
-        ZoneId zone = foodLogService.zoneFor(user);
 
         FoodLog foodLog = new FoodLog();
         foodLog.setUser(user);
@@ -139,8 +154,8 @@ public class FoodLogController {
         foodLog.setCarbs(carbs);
         foodLog.setFat(fat);
         foodLog.setFromMealPlan(fromMealPlan);
-        foodLog.setLogDate(LocalDate.now(zone));
-        foodLog.setTimeLogged(LocalDateTime.now(zone));
+        foodLog.setLogDate(day);
+        foodLog.setTimeLogged(day.atTime(LocalDateTime.now(zone).toLocalTime()));
         foodLogService.addFoodLog(foodLog);
         return null;
     }
@@ -148,6 +163,7 @@ public class FoodLogController {
     @PostMapping("/delete/{id}")
     public String deleteFoodLog(@AuthenticationPrincipal OAuth2User principal,
                                 @PathVariable Long id,
+                                @RequestParam(required = false, name = "from") String from,
                                 RedirectAttributes redirectAttributes) {
         User user = currentUserService.require(principal);
         FoodLog foodLog = foodLogService.getFoodLogById(id);
@@ -157,7 +173,7 @@ public class FoodLogController {
         }
         foodLogService.deleteFoodLog(id);
         redirectAttributes.addFlashAttribute("success", "Food log deleted!");
-        return "redirect:/dashboard";
+        return "history".equals(from) ? "redirect:/food-log/history" : "redirect:/dashboard";
     }
 
     @PostMapping("/random-suggestion")
@@ -216,11 +232,12 @@ public class FoodLogController {
         // Insertion order is newest day first, which is the order the page lists them in.
         Map<LocalDate, Map<String, Integer>> dailyTotalsMap = new java.util.LinkedHashMap<>();
         LocalDate today = foodLogService.today(user);
-        for (int i = 0; i < 7; i++) {
+        for (int i = 0; i < HISTORY_DAYS; i++) {
             LocalDate date = today.minusDays(i);
             dailyTotalsMap.put(date, foodLogService.calculateDailyTotals(user, date));
         }
         model.addAttribute("user", user);
+        model.addAttribute("impersonating", !user.getId().equals(currentUserService.require(principal).getId()));
         model.addAttribute("foodLogs", last7Days);
         model.addAttribute("dailyTotalsMap", dailyTotalsMap);
         return "food-log-history";
