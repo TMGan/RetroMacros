@@ -82,6 +82,38 @@ public class MacroCalculatorService {
         return bmr * multiplier;
     }
 
+    // Going to the gym isn't the same as training hard, so activity comes from what the client does:
+    // a starting point from their normal day, plus a little for each weekly workout by how hard it is.
+    // These are coaching estimates (a workout burns very roughly 150, 250 or 400 calories), not a published table.
+    static final double MAX_ACTIVITY_MULTIPLIER = 1.7;
+
+    public static double activityMultiplier(String dailyMovement, int workoutDays, String workoutIntensity) {
+        double base = switch (dailyMovement == null ? "" : dailyMovement) {
+            case UserProfile.MOVEMENT_WALKING -> 1.3;
+            case UserProfile.MOVEMENT_ON_FEET -> 1.4;
+            case UserProfile.MOVEMENT_PHYSICAL -> 1.5;
+            default -> 1.2;
+        };
+        double perWorkout = switch (workoutIntensity == null ? "" : workoutIntensity) {
+            case UserProfile.INTENSITY_MODERATE -> 0.025;
+            case UserProfile.INTENSITY_HARD -> 0.04;
+            default -> 0.015;
+        };
+        return Math.min(MAX_ACTIVITY_MULTIPLIER, base + Math.max(0, workoutDays) * perWorkout);
+    }
+
+    /** The answers in plain words, for the plan record and the coach. */
+    public static String describeActivity(String dailyMovement, int workoutDays, String workoutIntensity) {
+        String day = switch (dailyMovement == null ? "" : dailyMovement) {
+            case UserProfile.MOVEMENT_WALKING -> "Some walking and moving around";
+            case UserProfile.MOVEMENT_ON_FEET -> "On feet most of the day";
+            case UserProfile.MOVEMENT_PHYSICAL -> "Physical job";
+            default -> "Mostly sitting";
+        };
+        if (workoutDays <= 0) return day + ", no workouts";
+        return day + ", " + workoutDays + (workoutDays == 1 ? " workout" : " workouts") + " a week (" + workoutIntensity + ")";
+    }
+
     // goal: Lose Weight, Maintain Weight, Build Muscle
     public double adjustForGoal(double tdee, String goal) {
         if (goal == null) return tdee;
@@ -129,7 +161,9 @@ public class MacroCalculatorService {
     public NutritionTargets buildTargets(UserProfile p, Integer rampWeek) {
         double bmr = calculateBMRByFormula(p.getBmrFormula(), p.getWeight(), p.getHeightFeet(), p.getHeightInches(),
                 p.getAge(), p.getSex(), p.getBodyFatPercentage());
-        double tdee = calculateTDEE(bmr, p.getActivityLevel());
+        double tdee = p.getDailyMovement() != null
+                ? bmr * activityMultiplier(p.getDailyMovement(), p.getWorkoutDays(), p.getWorkoutIntensity())
+                : calculateTDEE(bmr, p.getActivityLevel());
         boolean female = "female".equalsIgnoreCase(p.getSex());
         Set<HealthCondition> health = p.getHealthConditions();
         boolean healthHold = HealthCondition.needsReview(health) && !p.isHealthCleared();

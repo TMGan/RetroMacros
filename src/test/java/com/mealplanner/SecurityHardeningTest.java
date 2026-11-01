@@ -82,7 +82,7 @@ class SecurityHardeningTest {
         return post("/generate")
                 .param("weight", "180").param("heightFeet", "5").param("heightInches", "10")
                 .param("age", "30").param("sex", "male")
-                .param("activityLevel", "Moderately Active").param("fitnessGoal", "Maintain Weight")
+                .param("dailyMovement", "walking").param("workoutDays", "3").param("workoutIntensity", "moderate").param("fitnessGoal", "Maintain Weight")
                 .param("acceptDisclaimer", "true");
     }
 

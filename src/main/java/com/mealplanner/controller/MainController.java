@@ -35,6 +35,11 @@ public class MainController {
     private final WeeklyAdjustmentService weeklyAdjustmentService;
     private final PlanBuildGuard planBuildGuard;
 
+    private static final List<String> MOVEMENTS = List.of(UserProfile.MOVEMENT_SITTING, UserProfile.MOVEMENT_WALKING,
+            UserProfile.MOVEMENT_ON_FEET, UserProfile.MOVEMENT_PHYSICAL);
+    private static final List<String> INTENSITIES = List.of(UserProfile.INTENSITY_LIGHT, UserProfile.INTENSITY_MODERATE,
+            UserProfile.INTENSITY_HARD);
+
     static final String PLAN_STILL_BUILDING = "Your plan is still being made. It's usually ready in 2 to 3 minutes. "
             + "Check My Food Plan in a couple of minutes.";
     // A second plan this soon after the last one is almost always a retry after the page was lost.
@@ -94,7 +99,9 @@ public class MainController {
             @RequestParam int heightInches,
             @RequestParam int age,
             @RequestParam String sex,
-            @RequestParam String activityLevel,
+            @RequestParam(name = "dailyMovement", required = false) String dailyMovement,
+            @RequestParam(name = "workoutDays", required = false) Integer workoutDays,
+            @RequestParam(name = "workoutIntensity", required = false) String workoutIntensity,
             @RequestParam String fitnessGoal,
             @RequestParam(name = "bmrFormula", required = false, defaultValue = "mifflin-st-jeor") String bmrFormula,
             @RequestParam(name = "bodyFatPercentage", required = false) Double bodyFatPercentage,
@@ -130,7 +137,9 @@ public class MainController {
         submitted.put("heightInches", heightInches);
         submitted.put("age", age);
         submitted.put("sex", sex);
-        submitted.put("activityLevel", activityLevel);
+        submitted.put("dailyMovement", dailyMovement);
+        submitted.put("workoutDays", workoutDays);
+        submitted.put("workoutIntensity", workoutIntensity);
         submitted.put("fitnessGoal", fitnessGoal);
         submitted.put("bmrFormula", bmrFormula);
         submitted.put("bodyFat", bodyFatPercentage);
@@ -149,7 +158,13 @@ public class MainController {
         submitted.put("dislikes", dislikes);
         submitted.put("dietStyle", dietStyle == null ? "flexible" : dietStyle);
 
-        List<String> errors = validateInputs(weight, heightFeet, heightInches, age, sex, activityLevel, fitnessGoal);
+        List<String> errors = validateInputs(weight, heightFeet, heightInches, age, sex, fitnessGoal);
+        if (!MOVEMENTS.contains(Objects.toString(dailyMovement, ""))) errors.add("Tell us what a normal day looks like.");
+        if (workoutDays == null || workoutDays < 0 || workoutDays > 7) errors.add("Tell us how many days a week you work out.");
+        // No workouts means there's no effort to ask about.
+        if (workoutDays != null && workoutDays > 0 && !INTENSITIES.contains(Objects.toString(workoutIntensity, ""))) {
+            errors.add("Tell us how hard your workouts are.");
+        }
         if (bodyFatPercentage != null && (bodyFatPercentage < 3 || bodyFatPercentage > 70)) {
             errors.add("Body fat must be between 3% and 70%.");
         }
@@ -224,7 +239,10 @@ public class MainController {
         userRepository.save(user);
 
         UserProfile profile = new UserProfile(weight, heightFeet, heightInches, age,
-                sex, activityLevel, fitnessGoal, allAllergies);
+                sex, MacroCalculatorService.describeActivity(dailyMovement, workoutDays, workoutDays == 0 ? null : workoutIntensity), fitnessGoal, allAllergies);
+        profile.setDailyMovement(dailyMovement);
+        profile.setWorkoutDays(workoutDays);
+        profile.setWorkoutIntensity(workoutDays == 0 ? null : workoutIntensity);
         profile.setBmrFormula(bmrFormula);
         profile.setBodyFatPercentage(bodyFatPercentage);
         profile.setGoalWeight(user.getGoalWeightLbs());
@@ -291,6 +309,9 @@ public class MainController {
             saved.setAge(profile.getAge());
             saved.setSex(profile.getSex());
             saved.setActivityLevel(profile.getActivityLevel());
+            saved.setDailyMovement(profile.getDailyMovement());
+            saved.setWorkoutDays(profile.getWorkoutDays());
+            saved.setWorkoutIntensity(profile.getWorkoutIntensity());
             saved.setFitnessGoal(profile.getFitnessGoal());
             saved.setTargetCalories(targets.getCalories());
             saved.setTargetProtein(targets.getProtein());
@@ -373,8 +394,9 @@ public class MainController {
                     && Objects.equals(p.getMacroStyle(), macroStyle)
                     && Objects.toString(p.getHealthConditions(), "").equals(healthKeys)
                     && Boolean.TRUE.equals(p.getHealthHold()) == onHoldNow
-                    // A plan from the old easing-in ramp had reduced targets; don't carry them forward.
-                    && p.getRampWeek() == null) {
+                    // A plan from the old easing-in ramp or old activity levels had different targets; don't carry them forward.
+                    && p.getRampWeek() == null
+                    && p.getDailyMovement() != null) {
                 first = p;
             }
         }
@@ -403,7 +425,6 @@ public class MainController {
 
     private void addFormModel(Model model, User user, Map<String, Object> prefill) {
         model.addAttribute("prefill", prefill);
-        model.addAttribute("activityLevels", activityLevels());
         model.addAttribute("goals", goals());
         model.addAttribute("allergyOptions", allergyOptions());
         model.addAttribute("foodOptions", FOOD_OPTIONS);
@@ -416,7 +437,7 @@ public class MainController {
     private Map<String, Object> prefillFromHistory(User user) {
         Map<String, Object> p = new HashMap<>();
         // The template reads every key, and a missing one is an error, so start them all as empty.
-        for (String key : List.of("weight", "heightFeet", "heightInches", "age", "sex", "activityLevel", "fitnessGoal",
+        for (String key : List.of("weight", "heightFeet", "heightInches", "age", "sex", "dailyMovement", "workoutDays", "workoutIntensity", "fitnessGoal",
                 "bodyFat", "otherAllergies")) {
             p.put(key, null);
         }
@@ -439,7 +460,10 @@ public class MainController {
             p.put("heightInches", last.getHeightInches());
             p.put("age", last.getAge());
             p.put("sex", last.getSex());
-            p.put("activityLevel", last.getActivityLevel());
+            // Plans from the older single activity level have no answers, so those clients answer the questions fresh.
+            p.put("dailyMovement", last.getDailyMovement());
+            p.put("workoutDays", last.getWorkoutDays());
+            p.put("workoutIntensity", last.getWorkoutIntensity());
             p.put("fitnessGoal", last.getFitnessGoal());
             if (last.getMacroStyle() != null) p.put("macroStyle", last.getMacroStyle());
             if (last.getEffortLevel() != null) p.put("effortLevel", last.getEffortLevel());
@@ -461,8 +485,7 @@ public class MainController {
         return s.length() > max ? s.substring(0, max) : s;
     }
 
-    private List<String> validateInputs(double weight, int feet, int inches, int age, String sex,
-                                        String activity, String goal) {
+    private List<String> validateInputs(double weight, int feet, int inches, int age, String sex, String goal) {
         List<String> errs = new ArrayList<>();
         if (weight < 50 || weight > 500) errs.add("Weight must be between 50 and 500 lbs.");
         if (feet < 3 || feet > 8) errs.add("Height feet must be between 3 and 8.");
@@ -471,13 +494,8 @@ public class MainController {
         if (!List.of("male", "female").contains(Optional.ofNullable(sex).orElse("").toLowerCase())) {
             errs.add("Sex must be Male or Female.");
         }
-        if (!activityLevels().contains(activity)) errs.add("Invalid activity level.");
         if (!goals().contains(goal)) errs.add("Invalid goal.");
         return errs;
-    }
-
-    private List<String> activityLevels() {
-        return List.of("Sedentary", "Occasionally Active", "Moderately Active", "Very Active");
     }
 
     private List<String> goals() {
