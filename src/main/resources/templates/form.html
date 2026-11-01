@@ -76,22 +76,61 @@
 
             <!-- Step 2: activity and goal -->
             <section class="form-step" data-step="2" data-title="Activity &amp; goal">
-                <h2 class="wizard-heading">How active are you?</h2>
-                <p class="wizard-sub">Think about your whole day, not just your workouts. Pick what matches a normal week, and if you're between two, pick the lower one.</p>
+                <h2 class="wizard-heading">What does a normal day look like?</h2>
+                <p class="wizard-sub">Not counting workouts. Be honest, and if you're between two, pick the lower one. It keeps your calories accurate.</p>
                 <div class="row row-cols-1 row-cols-md-2 g-3 mb-4">
-                    <div class="col" th:each="lvl : ${activityLevels}">
-                        <label class="choice-card">
-                            <input type="radio" name="activityLevel" th:value="${lvl}" required th:checked="${prefill.activityLevel == lvl}">
-                            <span class="choice-title" th:text="${lvl}">Sedentary</span>
-                            <span class="choice-sub" th:switch="${lvl}">
-                                <th:block th:case="'Sedentary'">Sitting most of the day, little or no exercise</th:block>
-                                <th:block th:case="'Occasionally Active'">Sitting most of the day, with workouts 1 to 3 days a week</th:block>
-                                <th:block th:case="'Moderately Active'">Workouts 3 to 5 days a week, and on your feet a good part of the day</th:block>
-                                <th:block th:case="'Very Active'">Hard training 6 to 7 days a week, or a job on your feet all day</th:block>
-                            </span>
-                        </label>
+                    <div class="col"><label class="choice-card">
+                        <input type="radio" name="dailyMovement" value="sitting" required th:checked="${prefill.dailyMovement == 'sitting'}">
+                        <span class="choice-title">Mostly sitting</span>
+                        <span class="choice-sub">Desk job, driving, or home most of the day</span>
+                    </label></div>
+                    <div class="col"><label class="choice-card">
+                        <input type="radio" name="dailyMovement" value="walking" required th:checked="${prefill.dailyMovement == 'walking'}">
+                        <span class="choice-title">Some walking and moving around</span>
+                        <span class="choice-sub">Errands, chores, regular walks</span>
+                    </label></div>
+                    <div class="col"><label class="choice-card">
+                        <input type="radio" name="dailyMovement" value="feet" required th:checked="${prefill.dailyMovement == 'feet'}">
+                        <span class="choice-title">On my feet most of the day</span>
+                        <span class="choice-sub">Retail, teaching, nursing, serving</span>
+                    </label></div>
+                    <div class="col"><label class="choice-card">
+                        <input type="radio" name="dailyMovement" value="physical" required th:checked="${prefill.dailyMovement == 'physical'}">
+                        <span class="choice-title">Physical job</span>
+                        <span class="choice-sub">Construction, moving, farm work</span>
+                    </label></div>
+                </div>
+
+                <h2 class="wizard-heading">How many days a week do you work out?</h2>
+                <p class="wizard-sub">Count a normal week, not your best week.</p>
+                <div class="choice-pills mb-4 d-flex flex-wrap gap-2">
+                    <label class="choice-pill" th:each="d : ${#numbers.sequence(0, 7)}">
+                        <input type="radio" name="workoutDays" th:value="${d}" required th:checked="${prefill.workoutDays == d}"><span th:text="${d}">0</span>
+                    </label>
+                </div>
+
+                <div id="workoutIntensityBlock">
+                    <h2 class="wizard-heading">How hard are those workouts, honestly?</h2>
+                    <p class="wizard-sub">Going to the gym isn't the same as training hard. Pick what's true most of the time.</p>
+                    <div class="row row-cols-1 row-cols-md-3 g-3 mb-4">
+                        <div class="col"><label class="choice-card">
+                            <input type="radio" name="workoutIntensity" value="light" required th:checked="${prefill.workoutIntensity == 'light'}">
+                            <span class="choice-title">Light</span>
+                            <span class="choice-sub">I can talk the whole time and rarely sweat much</span>
+                        </label></div>
+                        <div class="col"><label class="choice-card">
+                            <input type="radio" name="workoutIntensity" value="moderate" required th:checked="${prefill.workoutIntensity == 'moderate'}">
+                            <span class="choice-title">Moderate</span>
+                            <span class="choice-sub">I breathe harder and sweat, but could do more</span>
+                        </label></div>
+                        <div class="col"><label class="choice-card">
+                            <input type="radio" name="workoutIntensity" value="hard" required th:checked="${prefill.workoutIntensity == 'hard'}">
+                            <span class="choice-title">Hard</span>
+                            <span class="choice-sub">I'm out of breath, and my last reps are a real struggle</span>
+                        </label></div>
                     </div>
                 </div>
+
                 <h2 class="wizard-heading">What's your goal?</h2>
                 <div class="row row-cols-1 row-cols-md-3 g-3">
                     <div class="col" th:each="g : ${goals}">

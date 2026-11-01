@@ -65,7 +65,7 @@ class PlanEngineFeatureTest {
         return post("/generate")
                 .param("weight", "200").param("heightFeet", "5").param("heightInches", "10")
                 .param("age", "40").param("sex", "Male")
-                .param("activityLevel", "Moderately Active").param("fitnessGoal", "Lose Weight")
+                .param("dailyMovement", "walking").param("workoutDays", "3").param("workoutIntensity", "moderate").param("fitnessGoal", "Lose Weight")
                 .with(csrf());
     }
 
@@ -396,6 +396,74 @@ class PlanEngineFeatureTest {
         // Blank goes back to the formula.
         mvc.perform(post("/admin/users/" + client.getId() + "/calories").with(signedInAs(coach)).with(csrf()));
         assertThat(userRepository.findById(client.getId()).orElseThrow().getCalorieOverride()).isNull();
+    }
+
+    private MockHttpServletRequestBuilder planWithoutActivity() {
+        return post("/generate")
+                .param("weight", "200").param("heightFeet", "5").param("heightInches", "10")
+                .param("age", "40").param("sex", "Male").param("fitnessGoal", "Lose Weight")
+                .param("acceptDisclaimer", "true").with(csrf());
+    }
+
+    @Test
+    void theActivityQuestionsAreRequiredAndWorkoutEffortOnlyWithWorkouts() throws Exception {
+        User client = invitedClient();
+        mvc.perform(planWithoutActivity().with(signedInAs(client)))
+                .andExpect(content().string(containsString("Tell us what a normal day looks like")))
+                .andExpect(content().string(containsString("Tell us how many days a week you work out")));
+        mvc.perform(planWithoutActivity().param("dailyMovement", "sitting").param("workoutDays", "4").with(signedInAs(client)))
+                .andExpect(content().string(containsString("Tell us how hard your workouts are")));
+        // The old single choice no longer builds a plan.
+        mvc.perform(planWithoutActivity().param("activityLevel", "Very Active").with(signedInAs(client)))
+                .andExpect(content().string(containsString("Tell us what a normal day looks like")));
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client)).isEmpty();
+
+        // No workouts: no effort question, and any stray answer is ignored.
+        mvc.perform(planWithoutActivity().param("dailyMovement", "sitting").param("workoutDays", "0").param("workoutIntensity", "hard").with(signedInAs(client)))
+                .andExpect(status().isOk());
+        SavedMealPlan saved = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0);
+        assertThat(saved.getActivityLevel()).isEqualTo("Mostly sitting, no workouts");
+        assertThat(saved.getWorkoutIntensity()).isNull();
+    }
+
+    @Test
+    void lightGymWorkGetsFewerCaloriesThanHardAndTheAnswersAreRememberedAndShown() throws Exception {
+        User light = invitedClient();
+        mvc.perform(planWithoutActivity().param("dailyMovement", "sitting").param("workoutDays", "5").param("workoutIntensity", "light").with(signedInAs(light)))
+                .andExpect(status().isOk());
+        User hard = invitedClient();
+        mvc.perform(planWithoutActivity().param("dailyMovement", "sitting").param("workoutDays", "5").param("workoutIntensity", "hard").with(signedInAs(hard)))
+                .andExpect(status().isOk());
+        SavedMealPlan lightPlan = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(light).get(0);
+        assertThat(lightPlan.getTargetCalories()).isLessThan(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(hard).get(0).getTargetCalories());
+        assertThat(lightPlan.getActivityLevel()).isEqualTo("Mostly sitting, 5 workouts a week (light)");
+
+        // The next form starts from their answers.
+        String form = mvc.perform(get("/form").with(signedInAs(light))).andReturn().getResponse().getContentAsString();
+        assertThat(form).containsPattern("name=\"dailyMovement\" value=\"sitting\"[^>]*checked");
+        assertThat(form).containsPattern("name=\"workoutDays\" value=\"5\"[^>]*checked");
+        assertThat(form).containsPattern("name=\"workoutIntensity\" value=\"light\"[^>]*checked");
+
+        User coach = userRepository.findByEmail("coach@example.com").orElseGet(() -> userRepository.save(new User("coach@example.com", "Coach", "gid-coach-" + UUID.randomUUID())));
+        coach.setAdmin(true);
+        userRepository.save(coach);
+        mvc.perform(get("/admin/users/" + light.getId()).with(signedInAs(coach)))
+                .andExpect(content().string(containsString("Mostly sitting, 5 workouts a week (light)")));
+    }
+
+    @Test
+    void aPlanFromTheOldActivityLevelsIsNotCopiedByTheWeekLock() throws Exception {
+        User client = invitedClient();
+        mvc.perform(planWithoutActivity().param("dailyMovement", "physical").param("workoutDays", "7").param("workoutIntensity", "hard").with(signedInAs(client)))
+                .andExpect(status().isOk());
+        SavedMealPlan old = savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0);
+        int oldCalories = old.getTargetCalories();
+        old.setDailyMovement(null);
+        savedMealPlanRepository.save(old);
+
+        mvc.perform(planWithoutActivity().param("dailyMovement", "sitting").param("workoutDays", "2").param("workoutIntensity", "light").param("again", "true").with(signedInAs(client)))
+                .andExpect(status().isOk());
+        assertThat(savedMealPlanRepository.findByUserOrderByCreatedAtDesc(client).get(0).getTargetCalories()).isLessThan(oldCalories);
     }
 
     @Test

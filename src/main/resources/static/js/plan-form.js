@@ -105,7 +105,9 @@
         const v = id => document.getElementById(id).value;
         const set = (key, text) => { form.querySelector('[data-review="' + key + '"]').textContent = text; };
         set('you', v('weight') + ' lb · ' + v('heightFeet') + "' " + v('heightInches') + '" · ' + v('age') + ' · ' + checkedLabel('sex'));
-        set('activity', checkedLabel('activityLevel'));
+        const days = form.querySelector('input[name="workoutDays"]:checked').value;
+        set('activity', checkedLabel('dailyMovement') + (days === '0' ? ', no workouts'
+            : ', ' + days + (days === '1' ? ' workout' : ' workouts') + ' a week, ' + checkedLabel('workoutIntensity').toLowerCase()));
         const goalWeight = v('goalWeight').trim();
         set('goal', checkedLabel('fitnessGoal') + (goalWeight ? ', goal weight ' + goalWeight + ' lb' : ''));
         set('style', isCustom()
@@ -158,6 +160,19 @@
     }));
     document.getElementById('customSplit').hidden = !isCustom();
     updateSplit();
+
+    // With no workouts there's no effort to ask about.
+    const intensityBlock = document.getElementById('workoutIntensityBlock');
+    function updateIntensity() {
+        const none = form.querySelector('input[name="workoutDays"]:checked')?.value === '0';
+        intensityBlock.hidden = none;
+        intensityBlock.querySelectorAll('input').forEach(el => {
+            el.required = !none;
+            if (none) el.checked = false;
+        });
+    }
+    form.querySelectorAll('input[name="workoutDays"]').forEach(r => r.addEventListener('change', updateIntensity));
+    updateIntensity();
 
     // Body fat is only needed for the Katch-McArdle formula.
     const formula = document.getElementById('bmrFormula');

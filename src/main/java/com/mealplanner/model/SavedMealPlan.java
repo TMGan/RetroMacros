@@ -62,6 +62,20 @@ public class SavedMealPlan {
     private String macroStyle;
     @Column(length = 20)
     private String effortLevel;
+    // The activity answers this plan was built from. Null on plans from the older single activity level.
+    @Column(length = 20)
+    private String dailyMovement;
+    private Integer workoutDays;
+    @Column(length = 20)
+    private String workoutIntensity;
+
+    public String getDailyMovement() { return dailyMovement; }
+    public void setDailyMovement(String dailyMovement) { this.dailyMovement = dailyMovement; }
+    public Integer getWorkoutDays() { return workoutDays; }
+    public void setWorkoutDays(Integer workoutDays) { this.workoutDays = workoutDays; }
+    public String getWorkoutIntensity() { return workoutIntensity; }
+    public void setWorkoutIntensity(String workoutIntensity) { this.workoutIntensity = workoutIntensity; }
+
     // Ramp week this plan was built for (1 to 4), or null when not ramping.
     private Integer rampWeek;
     private Integer fiberTarget;

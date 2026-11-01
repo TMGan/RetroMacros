@@ -132,6 +132,9 @@
                     <button type="submit" class="btn btn-outline-neon">Save</button>
                 </form>
                 <small class="text-muted d-block mt-2" th:text="'Currently: ' + ${#temporals.format(accessEnd, 'MMM d, yyyy')}">Currently</small>
+                <h5 class="mb-1 mt-4">Reported activity</h5>
+                <p class="mb-0" th:if="${!#lists.isEmpty(mealPlans)}" th:text="${mealPlans[0].activityLevel}">Mostly sitting, 5 workouts a week (light)</p>
+                <p class="text-muted mb-0" th:if="${#lists.isEmpty(mealPlans)}">No plan yet.</p>
                 <h5 class="mb-1 mt-4">Daily calories</h5>
                 <p class="text-muted small mb-3">Set their calories yourself. Their next plan uses this number instead of the formula, health hold and weekly adjustment. Leave blank to go back to the formula.</p>
                 <div th:if="${param.caloriesSaved}" class="alert alert-success py-2">Saved. Their next plan uses it.</div>
