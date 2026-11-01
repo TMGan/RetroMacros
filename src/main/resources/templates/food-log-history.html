@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="_csrf" th:content="${_csrf.token}" />
+    <meta name="_csrf_header" th:content="${_csrf.headerName}" />
     <title>7-Day History - Retro Macros</title>
     <link rel="stylesheet" th:href="@{/webjars/bootstrap/css/bootstrap.min.css}" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
@@ -16,20 +18,27 @@
     <header class="today-head">
         <div>
             <h1 class="today-title">Past 7 days</h1>
-            <p class="today-date">What you logged each day, newest first.</p>
+            <p class="today-date">What you logged each day, newest first. Forgot something? Tap Add food on that day.</p>
         </div>
         <a href="/dashboard" class="today-link"><i class="bi bi-arrow-left"></i> Today</a>
     </header>
 
+    <div th:if="${success}" class="alert alert-success" th:text="${success}"></div>
+    <div th:if="${error}" class="alert alert-danger" th:text="${error}"></div>
+
     <section class="card neon">
         <div class="card-body p-4">
-            <p class="text-muted mb-0" th:if="${foodLogs == null || foodLogs.isEmpty()}">Nothing logged in the last 7 days.</p>
-            <div th:if="${foodLogs != null && !foodLogs.isEmpty()}">
+            <div>
                 <div class="history-day" th:each="date : ${dailyTotalsMap.keySet()}" th:with="totals=${dailyTotalsMap.get(date)}">
                     <div class="history-day-head">
-                        <h2 class="today-section-title" th:text="${#temporals.format(date, 'EEEE, MMM d')}">Wednesday, Oct 21</h2>
-                        <span class="log-macros" th:if="${totals.get('calories') > 0}"
-                              th:text="${totals.get('calories')} + ' cal · ' + ${totals.get('protein')} + 'g protein · ' + ${totals.get('carbs')} + 'g carbs · ' + ${totals.get('fat')} + 'g fat'">1330 cal</span>
+                        <div>
+                            <h2 class="today-section-title" th:text="${#temporals.format(date, 'EEEE, MMM d')}">Wednesday, Oct 21</h2>
+                            <span class="log-macros" th:if="${totals.get('calories') > 0}"
+                                  th:text="${totals.get('calories')} + ' cal · ' + ${totals.get('protein')} + 'g protein · ' + ${totals.get('carbs')} + 'g carbs · ' + ${totals.get('fat')} + 'g fat'">1330 cal</span>
+                        </div>
+                        <button type="button" class="btn btn-outline-neon btn-sm js-add-food" data-bs-toggle="modal" data-bs-target="#addFoodModal"
+                                th:unless="${impersonating or (challenge != null and challenge.readOnly)}"
+                                th:attr="data-date=${date},data-label=${#temporals.format(date, 'EEEE, MMM d')}"><i class="bi bi-plus-lg"></i> Add food</button>
                     </div>
                     <ul class="log-list" th:if="${totals.get('calories') > 0}">
                         <li th:each="log : ${foodLogs}" th:if="${log.logDate.equals(date)}">
@@ -38,6 +47,11 @@
                                 <div class="log-desc" th:text="${log.foodDescription}">chicken and rice</div>
                                 <div class="log-macros" th:text="${log.calories} + ' cal · ' + ${log.protein} + 'g protein · ' + ${log.carbs} + 'g carbs · ' + ${log.fat} + 'g fat'">710 cal</div>
                             </div>
+                            <form th:action="@{/food-log/delete/{id}(id=${log.id})}" method="post"
+                                  th:unless="${impersonating or (challenge != null and challenge.readOnly)}">
+                                <input type="hidden" name="from" value="history" />
+                                <button type="submit" class="btn btn-sm btn-link text-muted" aria-label="Remove this food"><i class="bi bi-x-lg"></i></button>
+                            </form>
                         </li>
                     </ul>
                     <p class="text-muted small mb-0" th:unless="${totals.get('calories') > 0}">Nothing logged.</p>
@@ -47,7 +61,50 @@
     </section>
 </div>
 
+<!-- Add food to one of the days above -->
+<div class="modal fade" id="addFoodModal" tabindex="-1" aria-labelledby="addFoodTitle" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content neon">
+        <div class="modal-header">
+            <h5 class="modal-title" id="addFoodTitle">Add food</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+            <div class="log-alert alert" role="alert" hidden></div>
+            <form class="log-form" th:action="@{/food-log/add}" method="post" id="addFoodForm">
+                <input type="hidden" name="timezone" id="addFoodTimezone" value="" />
+                <input type="hidden" name="logDate" id="addFoodDate" value="" />
+                <label class="form-label" for="addFoodDescription">What did you eat?</label>
+                <div class="d-flex gap-2">
+                    <input type="text" class="form-control" id="addFoodDescription" name="foodDescription" maxlength="500" required placeholder="e.g. chicken burrito bowl with rice and beans">
+                    <button type="button" class="btn btn-outline-neon text-nowrap" id="addFoodEstimate"><i class="bi bi-calculator"></i> Estimate</button>
+                </div>
+                <small class="text-muted">We'll estimate the numbers. You can change them before saving.</small>
+                <div class="log-fields">
+                    <div class="row g-2">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label" for="addFoodMeal">Meal</label>
+                            <select class="form-select" name="mealName" id="addFoodMeal" required>
+                                <option value="Breakfast">Breakfast</option>
+                                <option value="Lunch">Lunch</option>
+                                <option value="Dinner">Dinner</option>
+                                <option value="Snack">Snack</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="col-3 col-md-2"><label class="form-label" for="addFoodCalories">Cal</label><input type="number" class="form-control" id="addFoodCalories" name="calories" min="0" max="5000" required></div>
+                        <div class="col-3 col-md-2"><label class="form-label" for="addFoodProtein">Protein</label><input type="number" class="form-control" id="addFoodProtein" name="protein" min="0" max="500" required></div>
+                        <div class="col-3 col-md-2"><label class="form-label" for="addFoodCarbs">Carbs</label><input type="number" class="form-control" id="addFoodCarbs" name="carbs" min="0" max="1000" required></div>
+                        <div class="col-3 col-md-2"><label class="form-label" for="addFoodFat">Fat</label><input type="number" class="form-control" id="addFoodFat" name="fat" min="0" max="500" required></div>
+                    </div>
+                    <div class="text-end mt-3"><button type="submit" class="btn btn-neon">Save</button></div>
+                </div>
+            </form>
+        </div>
+    </div></div>
+</div>
+
 <script th:src="@{/webjars/bootstrap/js/bootstrap.bundle.min.js}"></script>
+<script th:src="@{/js/food-log-history.js}"></script>
 <div th:replace="~{fragments/footer :: footer}"></div>
 </body>
 </html>
